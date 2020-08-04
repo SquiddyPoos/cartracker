@@ -7,6 +7,10 @@ app.config.from_object(__name__)
 def mainPage():
 	return render_template('home.html', data = "Hello, its a car tracker!")
 
+@app.route('/fetch-data', methods = ["POST", "GET"])
+def get_data():
+	return "abcde"
+
 if __name__ == "__main__":
 	app.debug = True
 	app.run(host='127.0.0.1',port=8080)
