@@ -9,7 +9,7 @@ def mainPage():
 
 @app.route('/fetch-data', methods = ["POST", "GET"])
 def get_data():
-	return "abcde"
+	return '{"lat": "xd", "long": "xd"}'
 
 if __name__ == "__main__":
 	app.debug = True

@@ -1,6 +1,7 @@
 function onClick() {
-	fetch("/fetch-data")
+	fetch('./fetch-data')
+	.then(response => response.json())
 	.then(function(data) {
-		document.getElementById("Content").innerHTML = data;
+		document.getElementById("content").innerHTML = data.lat + ", " + data.long;
 	})
 }
