@@ -1,4 +1,5 @@
 from flask import Flask, render_template, url_for, request, session, redirect, flash
+import random
 
 app = Flask(__name__)
 app.config.from_object(__name__)
@@ -9,7 +10,9 @@ def mainPage():
 
 @app.route('/fetch-data', methods = ["POST", "GET"])
 def get_data():
-	return '{"lat": "xd", "long": "xd"}'
+	lat = random.randint(0, 1e10) / 1e10 * 180 - 90
+	lon = random.randint(0, 1e10) / 1e10 * 260 - 180
+	return f'{{"lat": {lat}, "long": {lon}}}'
 
 if __name__ == "__main__":
 	app.debug = True

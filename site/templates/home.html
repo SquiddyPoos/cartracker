@@ -2,10 +2,10 @@
 
 <html>
 	<head>
-		<link rel="stylesheet" href="style.css" />
+		<link rel="stylesheet" href= "{{ url_for('static',filename='styles/style.css') }}" />
 		<link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet" /> 
 		<title>Hello!</title>
-		<script async src = "internal.js"></script>
+		<script src = "{{ url_for('static',filename='js/internal.js') }}"></script>
 	</head>
 
 	<body>
