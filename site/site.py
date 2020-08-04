@@ -5,7 +5,7 @@ app.config.from_object(__name__)
 
 @app.route('/')
 def mainPage():
-	return render_template('index.html', data = "Hello, its a car tracker!")
+	return render_template('home.html', data = "Hello, its a car tracker!")
 
 if __name__ == "__main__":
 	app.debug = True
