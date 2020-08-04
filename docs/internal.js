@@ -1,1 +1,3 @@
-document.getElementById("paragraph").innerHTML = "Hello People";
+function onClick() {
+	document.getElementById("paragraph").innerHTML = "Hello People";
+}
