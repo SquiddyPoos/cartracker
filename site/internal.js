@@ -1,3 +1,6 @@
 function onClick() {
-	document.getElementById("Content").innerHTML = "lol";
+	fetch("/fetch-data")
+	.then(function(data) {
+		document.getElementById("Content").innerHTML = data;
+	})
 }
