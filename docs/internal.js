@@ -1,3 +1,4 @@
 function onClick() {
-	document.getElementById("paragraph").innerHTML = "Hello People";
+	var current = parseInt(document.getElementById("counter").innerHTML);
+	document.getElementById("counter").innerHTML = current + 1;
 }
