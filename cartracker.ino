@@ -2,29 +2,54 @@
 
 #define RX_PIN 10
 #define TX_PIN 11
+#define SLEEP_PIN 13
 #define ON_OFF 12
 
+SoftwareSerial IOT(RX_PIN, TX_PIN);
+
 void turnOn() {
+  //pulse off then on
+  digitalWrite(ON_OFF, LOW);
+  delay(1050); //At least 1s (datasheet)
   digitalWrite(ON_OFF, HIGH);
+  //wait for UART port -> from datasheet, minimum 4.5s. Spam "AT" and wait for "OK"
+  while (!IOT.available()) {
+    IOT.write("AT");
+    delay(250);
+  }
+  //read all
+  while (IOT.available()) {
+    IOT.read();
+  }
 }
 
-SoftwareSerial Sim7000C(10, 11);
+void sleepOn() {
+  digitalWrite(SLEEP_PIN, HIGH);
+}
+
+void sleepOff() {
+  digitalWrite(SLEEP_PIN, LOW);
+}
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  Sim7000C.begin(115200);
+  IOT.begin(9600);
   pinMode(ON_OFF, OUTPUT);
+  //pinMode(SLEEP_PIN, OUTPUT);
+  digitalWrite(ON_OFF, HIGH);
+  delay(100);
   turnOn();
+  Serial.println("Serial OK");
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-  while (Sim7000C.available()) {
-    Serial.write(Sim7000C.read());
+  while (IOT.available()) {
+    Serial.write(IOT.read());
   }
 
   while (Serial.available()) {
-    Sim7000C.write(Serial.read());
+    IOT.write(Serial.read());
   }
 }
