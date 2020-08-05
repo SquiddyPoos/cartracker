@@ -1,1 +1,1 @@
-web: gunicorn site/site.py
+web: gunicorn runsite:site

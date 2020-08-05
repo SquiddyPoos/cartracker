@@ -13,7 +13,3 @@ def get_data():
 	lat = random.randint(0, 1e10) / 1e10 * 180 - 90
 	lon = random.randint(0, 1e10) / 1e10 * 260 - 180
 	return f'{{"lat": {lat}, "long": {lon}}}'
-
-if __name__ == "__main__":
-	app.debug = True
-	app.run(host='127.0.0.1',port=8080)
