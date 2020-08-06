@@ -4,12 +4,13 @@ import os
 
 app = Flask(__name__)
 app.config.update(
-	'SECRET_KEY' = eval(os.environ.get("SECRET_KEY"))
+	'SECRET_KEY' = eval(os.environ.get("SECRET_KEY")),
+	"API_KEY" = os.environ.get("API_KEY")
 )
 
 @app.route('/')
 def mainPage():
-	return render_template('home.html', data = "Hello, its a car tracker!")
+	return render_template('home.html', API_KEY = app.config["API_KEY"])
 
 @app.route('/fetch-data', methods = ["POST", "GET"])
 def get_data():
