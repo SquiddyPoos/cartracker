@@ -23,6 +23,16 @@ void turnOn() {
   }
 }
 
+String getGPSData() {
+  IOT.write("AT+CGNSPWR=1");
+  IOT.write("AT+CGNSINF");
+  String data = "";
+  while (IOT.available()) {
+    data += IOT.read();
+  }
+  return data;
+}
+
 void sleepOn() {
   digitalWrite(SLEEP_PIN, HIGH);
 }
