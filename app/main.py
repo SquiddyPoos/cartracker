@@ -4,8 +4,8 @@ import os
 
 app = Flask(__name__)
 app.config.update(
-	'SECRET_KEY' = eval(os.environ.get("SECRET_KEY")),
-	"API_KEY" = os.environ.get("API_KEY")
+	SECRET_KEY = eval(os.environ.get("SECRET_KEY")),
+	API_KEY = os.environ.get("API_KEY")
 )
 
 @app.route('/')
