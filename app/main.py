@@ -15,6 +15,6 @@ def mainPage():
 @app.route('/fetch-data', methods = ["POST", "GET"])
 def get_data():
 	lat = random.randint(0, 1e10) / 1e10 * 180 - 90
-	lon = random.randint(0, 1e10) / 1e10 * 260 - 180
+	lon = random.randint(0, 1e10) / 1e10 * 360 - 180
 	return f'{{"lat": {lat}, "long": {lon}}}'
 
