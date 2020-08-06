@@ -1,7 +1,11 @@
 from flask import Flask, render_template, url_for, request, session, redirect, flash
 import random
+import os
 
 app = Flask(__name__)
+app.config.update(
+	'SECRET_KEY' = eval(os.environ.get("SECRET_KEY"))
+)
 
 @app.route('/')
 def mainPage():
