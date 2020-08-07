@@ -2,6 +2,7 @@ from flask import Flask, render_template, url_for, request, session, redirect, f
 import random
 import os
 import ast
+import json
 import psycopg2
 
 app = Flask(__name__)
@@ -20,9 +21,22 @@ def mainPage():
 
 @app.route('/fetch-data', methods = ["POST"])
 def get_data():
-	lat = random.randint(0, 1e10) / 1e10 * 180 - 90
-	lon = random.randint(0, 1e10) / 1e10 * 360 - 180
-	return f'{{"lat": {lat}, "long": {lon}}}'
+	recv_id = request.headers.get("id")
+	if (recv_id):
+		gps_lat = None
+		gps_long = None
+		curs.execute("SELECT * FROM gps_data WHERE id = %s", (recv_id))
+		data = curs.fetchall()
+		if (len(data) != 0):
+			gps_lat = data[0][1]
+			gps_long = data[0][2]
+		json_data = {
+			lat: gps_lat, 
+			long: gps_long
+		}
+		return json.dumps(json_data, indent = 4)
+	else:
+		return "NO ID PROVIDED"
 
 @app.route('/send-data', methods = ["POST"])
 def process_gps_data():
@@ -30,5 +44,11 @@ def process_gps_data():
 	recv_id = request.headers.get("id")
 	gps_lat = request.headers.get("gps_lat")
 	gps_long = request.headers.get("gps_long")
-	curs.execute("INSERT INTO gps_data(id,lat,long) VALUES (%s, %s, %s)", (recv_id, gps_lat, gps_long))
+	curs.execute("SELECT * FROM gps_data WHERE id = %s", (recv_id))
+	if (len(curs.fetchall()) == 0):
+		curs.execute("INSERT INTO gps_data(id,lat,long) VALUES (%s, %s, %s)", (recv_id, gps_lat, gps_long))
+		con.commit()
+	else:
+		curs.execute("UPDATE gps_data SET lat = %s, long = %s WHERE id = %s", (gps_lat, gps_long, recv_id))
+		con.commit()
 	return "OK"
