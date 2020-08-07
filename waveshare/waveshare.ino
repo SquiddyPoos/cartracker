@@ -20,11 +20,11 @@
 Waveshare_ILI9486 Waveshield;
 
 int get_parking_no() {
-  return 10;
+  return -1;
 }
 
 bool is_alarm_on() {
-  return true;
+  return false;
 }
 
 void drawOnOff(int x, int y, bool onOff) {
@@ -54,9 +54,80 @@ void volSlider(int x, int y, int vol) {
 }
 
 bool sound = true;
-int volume = 50;
+int volume = 100;
 bool light = true;
 bool lblink = true;
+
+//number - x1 - y1 - x2 - y2
+//x -> 0 - 320
+//y -> 200 - 480
+//-1 -> bcsp, -2 is a back button, -3 is filler.
+int keypad_hitbox[13][5] = {
+  {1, 0, 200, 106, 270},
+  {2, 106, 200, 213, 270},
+  {3, 213, 200, 320, 270},
+  {4, 0, 270, 106, 340},
+  {5, 106, 270, 213, 340},
+  {6, 213, 270, 320, 340},
+  {7, 0, 340, 106, 410},
+  {8, 106, 340, 213, 410},
+  {9, 213, 340, 320, 410},
+  {0, 106, 410, 213, 480},
+  {-1, 213, 410, 320, 480},
+  {-2, 0, 0, 140, 50},
+  {-3, 0, 410, 106, 480}
+};
+
+void drawBKSP(int x, int y) {
+  //outline
+  Waveshield.drawLine(x + 20, y + 35, x + 40, y + 15, BLACK);
+  Waveshield.drawLine(x + 40, y + 15, x + 85, y + 15, BLACK);
+  Waveshield.drawLine(x + 85, y + 15, x + 85, y + 55, BLACK);
+  Waveshield.drawLine(x + 85, y + 55, x + 40, y + 55, BLACK);
+  Waveshield.drawLine(x + 40, y + 55, x + 20, y + 35, BLACK);
+
+  //X
+  Waveshield.drawLine(x + 75, y + 25, x + 50, y + 45, BLACK);
+  Waveshield.drawLine(x + 50, y + 25, x + 75, y + 45, BLACK);
+}
+
+void drawBKbutton(int x, int y) {
+  //<
+  Waveshield.drawLine(x + 15, y + 25, x + 35, y + 10, BLACK);
+  Waveshield.drawLine(x + 15, y + 25, x + 35, y + 40, BLACK);
+
+  //back
+  Waveshield.setCursor(x + 50, y + 15);
+  Waveshield.setTextSize(3);
+  Waveshield.print("Back");
+}
+
+void renderKeypad() {
+  //set colour
+  Waveshield.fillScreen(LBLUE);
+  Waveshield.setTextColor(BLACK);
+
+  Waveshield.fillRect(0, 200, 320, 280, YELLOW);
+  //based on the hitboxes in keypad_hitbox.
+  for (int i = 0; i < 13; i++) {
+    if (keypad_hitbox[i][0] >= 0) {
+      Waveshield.fillRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], BLACK);
+      Waveshield.setCursor(keypad_hitbox[i][1] + 42, keypad_hitbox[i][2] + 20);
+      Waveshield.setTextSize(5);
+      Waveshield.print(String(keypad_hitbox[i][0]));
+    } else if (keypad_hitbox[i][0] == -1) {
+      Waveshield.fillRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], BLACK);
+      drawBKSP(keypad_hitbox[i][1], keypad_hitbox[i][2]);
+    } else if (keypad_hitbox[i][0] == -2) {
+      drawBKbutton(keypad_hitbox[i][1], keypad_hitbox[i][2]);
+    } else {
+      Waveshield.fillRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], BLACK);
+    }
+  }
+}
 
 void render() {
   //set colour
@@ -81,28 +152,28 @@ void render() {
   }
   
   //Draw button -> Enter/Change parking lot no.
-  Waveshield.fillRoundRect(15, 110, 140, 50, 4, YELLOW);
-  Waveshield.drawRoundRect(15, 110, 140, 50, 4, BLACK);
-  Waveshield.setCursor(25, 120);
+  Waveshield.fillRoundRect(15, 115, 140, 50, 4, YELLOW);
+  Waveshield.drawRoundRect(15, 115, 140, 50, 4, BLACK);
+  Waveshield.setCursor(25, 122);
   Waveshield.setTextSize(2);
   Waveshield.print("Change lot");
-  Waveshield.setCursor(25, 137);
+  Waveshield.setCursor(25, 144);
   Waveshield.print("  number");
 
   //Draw button -> Sound alarm/on light
-  Waveshield.fillRoundRect(165, 110, 140, 50, 4, YELLOW);
-  Waveshield.drawRoundRect(165, 110, 140, 50, 4, BLACK);
+  Waveshield.fillRoundRect(165, 115, 140, 50, 4, YELLOW);
+  Waveshield.drawRoundRect(165, 115, 140, 50, 4, BLACK);
   if (is_alarm_on()) {
-    Waveshield.setCursor(175, 120);
+    Waveshield.setCursor(175, 122);
     Waveshield.setTextSize(2);
     Waveshield.print("Stop alarm");
-    Waveshield.setCursor(180, 137);
+    Waveshield.setCursor(180, 144);
     Waveshield.print("and light");
   } else {
-    Waveshield.setCursor(175, 120);
+    Waveshield.setCursor(170, 122);
     Waveshield.setTextSize(2);
     Waveshield.print("Start alarm");
-    Waveshield.setCursor(170, 137);
+    Waveshield.setCursor(170, 144);
     Waveshield.print(" and light");
   }
 
@@ -149,10 +220,12 @@ void setup() {
   // put your setup code here, to run once:
   SPI.begin();
   Waveshield.begin();
-  render();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
-
+  render();
+  delay(5000);
+  renderKeypad();
+  delay(5000);
 }
