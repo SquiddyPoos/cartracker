@@ -7,8 +7,12 @@ import psycopg2
 app = Flask(__name__)
 app.config.update(
 	SECRET_KEY = ast.literal_eval(str(os.environ.get("SECRET_KEY"))),
-	API_KEY = str(os.environ.get("API_KEY"))
+	API_KEY = str(os.environ.get("API_KEY")),
+	DATABASE_URL = str(os.environ.get('DATABASE_URL'))
 )
+
+con = psycopg2.connect(app.config["DATABASE_URL"], sslmode = "require")
+curs = con.cursor()
 
 @app.route('/')
 def mainPage():
@@ -23,4 +27,8 @@ def get_data():
 @app.route('/send-data', methods = ["POST"])
 def process_gps_data():
 	print(request.headers.get("id"), request.headers.get("gps_lat"), request.headers.get("gps_long"))
+	recv_id = request.headers.get("id")
+	gps_lat = request.headers.get("gps_lat")
+	gps_long = request.headers.get("gps_long")
+	curs.execute("INSERT INTO gps_data(id,lat,long) VALUES (%s, %s, %s)", (recv_id, gps_lat, gps_long))
 	return "OK"
