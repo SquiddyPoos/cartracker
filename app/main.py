@@ -19,7 +19,7 @@ curs = con.cursor()
 def mainPage():
 	return render_template('home.html', API_KEY = app.config["API_KEY"])
 
-@app.route('/fetch-data', methods = ["POST"])
+@app.route('/fetch-gps', methods = ["POST"])
 def get_data():
 	recv_id = request.headers.get("id")
 	if (recv_id):
