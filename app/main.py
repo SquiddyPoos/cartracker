@@ -14,7 +14,7 @@ app.config.update(
 def mainPage():
 	return render_template('home.html', API_KEY = app.config["API_KEY"])
 
-@app.route('/fetch-data', methods = ["POST", "GET"])
+@app.route('/fetch-data', methods = ["POST"])
 def get_data():
 	lat = random.randint(0, 1e10) / 1e10 * 180 - 90
 	lon = random.randint(0, 1e10) / 1e10 * 360 - 180
