@@ -465,9 +465,11 @@ void render() {
     Waveshield.drawRoundRect(st_alm_hb[0], st_alm_hb[1], st_alm_hb[2] - st_alm_hb[0], st_alm_hb[3] - st_alm_hb[1], 4, BLACK);
     Waveshield.setCursor(175, 122);
     Waveshield.setTextSize(2);
+    Waveshield.setTextColor(WHITE);
     Waveshield.print("Stop alarm");
     Waveshield.setCursor(180, 144);
     Waveshield.print("and light");
+    Waveshield.setTextColor(BLACK);
   } else {
     Waveshield.fillRoundRect(st_alm_hb[0], st_alm_hb[1], st_alm_hb[2] - st_alm_hb[0], st_alm_hb[3] - st_alm_hb[1], 4, GREEN);
     Waveshield.drawRoundRect(st_alm_hb[0], st_alm_hb[1], st_alm_hb[2] - st_alm_hb[0], st_alm_hb[3] - st_alm_hb[1], 4, BLACK);
