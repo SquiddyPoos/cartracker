@@ -15,7 +15,10 @@
 #define WHITE   0xFFFF
 #define LBLUE   0xD7FF
 
-#define SLEN    105
+#define SLEN        105
+#define KEYPAD_SIZE 16
+#define AM_SIZE     19
+#define NZ_SIZE     19
 
 Waveshare_ILI9486 Waveshield;
 
@@ -23,22 +26,24 @@ bool sound = true;
 int volume = 100;
 bool light = true;
 bool lblink = true;
-int parking_no = 0;
+String parking_no = "";
 bool alarm_on = false;
-int screen = 0; //0 -> main, 1 -> keypad, 2 -> calibration, 3 -> loading, 4 -> confirmation
+int screen = 0; //0 -> main, 1 -> keypad, 2 -> calibration, 3 -> loading, 4 -> confirmation, 5 -> A - N, 6 -> N - Z
 bool currently_pressed = false; //buttons only work if this is false
-int current_number = 0;
+String current_number = "";
 
 TSConfigData tscd = {100, 939, 59, 970}; //calibration, determined experimentally (from calibration.ino)
 
 //number - x1 - y1 - x2 - y2
 //x -> 0 - 320
 //y -> 200 - 480
-//-1 -> bcsp, -2 is a back button, -3 is enter, -4 is remove button (revert to not set)
+//-1 -> bcsp, -2 is a back button, -3 is enter, -4 is remove button (revert to not set), -5 -> A - N, -6 -> O - Z
 //Order is for aesthetic purposes (drawing is not instant)
-int keypad_hitbox[14][5] = {
+int keypad_hitbox[KEYPAD_SIZE][5] = {
   {-2, 0, 0, 140, 50},
   {-4, 190, 0, 320, 50},
+  {-5, 0, 150, 80, 200},
+  {-6, 240, 150, 320, 200},
   {1, 0, 200, 106, 270},
   {2, 106, 200, 213, 270},
   {3, 213, 200, 320, 270},
@@ -50,6 +55,50 @@ int keypad_hitbox[14][5] = {
   {9, 213, 340, 320, 410},
   {-1, 213, 410, 320, 480},
   {0, 106, 410, 213, 480},
+  {-3, 0, 410, 106, 480}
+};
+
+int AM_hitbox[AM_SIZE][5] = {
+  {-2, 0, 0, 140, 50},
+  {-4, 190, 0, 320, 50},
+  {-5, 0, 150, 80, 200},
+  {-6, 240, 150, 320, 200},
+  {'A', 0, 200, 80, 270},
+  {'B', 80, 200, 160, 270},
+  {'C', 160, 200, 240, 270},
+  {'D', 240, 200, 320, 270},
+  {'H', 240, 270, 320, 340},
+  {'G', 160, 270, 240, 340},
+  {'F', 80, 270, 160, 340},
+  {'E', 0, 270, 80, 340},
+  {'I', 0, 340, 80, 410},
+  {'J', 80, 340, 160, 410},
+  {'K', 160, 340, 240, 410},
+  {'L', 240, 340, 320, 410},
+  {-1, 213, 410, 320, 480},
+  {'M', 106, 410, 213, 480},
+  {-3, 0, 410, 106, 480}
+};
+
+int NZ_hitbox[NZ_SIZE][5] = {
+  {-2, 0, 0, 140, 50},
+  {-4, 190, 0, 320, 50},
+  {-5, 0, 150, 80, 200},
+  {-6, 240, 150, 320, 200},
+  {'N', 0, 200, 80, 270},
+  {'O', 80, 200, 160, 270},
+  {'P', 160, 200, 240, 270},
+  {'Q', 240, 200, 320, 270},
+  {'U', 240, 270, 320, 340},
+  {'T', 160, 270, 240, 340},
+  {'S', 80, 270, 160, 340},
+  {'R', 0, 270, 80, 340},
+  {'V', 0, 340, 80, 410},
+  {'W', 80, 340, 160, 410},
+  {'X', 160, 340, 240, 410},
+  {'Y', 240, 340, 320, 410},
+  {-1, 213, 410, 320, 480},
+  {'Z', 106, 410, 213, 480},
   {-3, 0, 410, 106, 480}
 };
 
@@ -66,9 +115,9 @@ int ok_btn_hb[4] = {120, 430, 200, 470}; //Used in the calibration screen's OK b
 int yes_btn_hb[4] = {50, 250, 150, 300}; //Used in confirmation screen
 int no_btn_hb[4] = {170, 250, 270, 300}; //Used in confirmation screen
 
-int get_parking_no() {
+String get_parking_no() {
   delay(1000);
-  return -1;
+  return "";
 }
 
 bool is_alarm_on() {
@@ -213,14 +262,13 @@ void drawBKbutton(int x, int y) {
   Waveshield.print("Back");
 }
 
-String correct_format(int no, int len) {
+String correct_format(String no, int len) {
   //this function inserts spaces before a number
-  String no_s = String(no);
-  String zeroes = "";
-  for (int i = 0; i < len - no_s.length(); i++) {
-    zeroes += '0';
+  String whitespace = "";
+  for (int i = 0; i < len - no.length(); i++) {
+    whitespace += ' ';
   }
-  return zeroes + no_s;
+  return whitespace + no;
 }
 
 void renderCalibration() {
@@ -274,18 +322,16 @@ void renderLoading() {
 
 void renderNumber() {
   //Cover current number
-  Waveshield.fillRect(120, 160, 80, 27, YELLOW);
+  Waveshield.fillRect(113, 160, 100, 27, YELLOW);
 
   //draw number
-  Waveshield.setCursor(125, 165);
+  Waveshield.setCursor(115, 165);
   Waveshield.setTextSize(3);
-  Waveshield.print(correct_format(current_number, 4));
+  Waveshield.print(correct_format(current_number, 5));
 }
 
 void renderKeypad() {
-  //set screen
-  screen = 1;
-  
+  //base render function for general keypad layout  
   //set colour
   Waveshield.fillScreen(LBLUE);
   Waveshield.setTextColor(BLACK);
@@ -304,15 +350,24 @@ void renderKeypad() {
   //Render number -> adds number & updates it
   renderNumber();
 
-  //draw 4 rects below no.
-  Waveshield.fillRect(125, 190, 16, 2, BLACK);
-  Waveshield.fillRect(143, 190, 16, 2, BLACK);
-  Waveshield.fillRect(161, 190, 16, 2, BLACK);
-  Waveshield.fillRect(179, 190, 16, 2, BLACK);
+  //draw 5 rects below no.
+  Waveshield.fillRect(115, 190, 16, 2, BLACK);
+  Waveshield.fillRect(133, 190, 16, 2, BLACK);
+  Waveshield.fillRect(151, 190, 16, 2, BLACK);
+  Waveshield.fillRect(169, 190, 16, 2, BLACK);
+  Waveshield.fillRect(187, 190, 16, 2, BLACK);
+
+  //render the 0-9 keypad
+  render09();
+}
+
+void render09() { 
+  //set screen
+  screen = 1; 
   
   Waveshield.fillRect(0, 200, 320, 280, YELLOW);
   //based on the hitboxes in keypad_hitbox.
-  for (int i = 0; i < 14; i++) {
+  for (byte i = 0; i < KEYPAD_SIZE; i++) {
     if (keypad_hitbox[i][0] >= 0) {
       Waveshield.fillRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], YELLOW);
       Waveshield.drawRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], BLACK);
@@ -339,6 +394,140 @@ void renderKeypad() {
       Waveshield.setCursor(keypad_hitbox[i][1] + 15, keypad_hitbox[i][2] + 15);
       Waveshield.setTextSize(3);
       Waveshield.print("Delete");
+    } else if (keypad_hitbox[i][0] == -5) {
+      //A - M button
+      Waveshield.fillRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], BLACK);
+      Waveshield.setCursor(keypad_hitbox[i][1] + 15, keypad_hitbox[i][2] + 15);
+      Waveshield.setTextSize(3);
+      Waveshield.print("A-M");
+    } else if (keypad_hitbox[i][0] == -6) {
+      //N - Z button
+      Waveshield.fillRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], BLACK);
+      Waveshield.setCursor(keypad_hitbox[i][1] + 15, keypad_hitbox[i][2] + 15);
+      Waveshield.setTextSize(3);
+      Waveshield.print("N-Z");
+    }
+  }
+}
+
+void renderAM() {
+  //set screen
+  screen = 5;
+  
+  //Render number -> adds number & updates it
+  renderNumber();
+  
+  Waveshield.fillRect(0, 200, 320, 280, YELLOW);
+  //based on the hitboxes in AM_hitbox.
+  for (byte i = 0; i < AM_SIZE; i++) {
+    if (AM_hitbox[i][0] == 'M') {
+      Waveshield.fillRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], BLACK);
+      Waveshield.setCursor(AM_hitbox[i][1] + 42, AM_hitbox[i][2] + 20);
+      Waveshield.setTextSize(5);
+      Waveshield.print(String((char)AM_hitbox[i][0]));
+    } else if (AM_hitbox[i][0] >= 0) {
+      Waveshield.fillRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], BLACK);
+      Waveshield.setCursor(AM_hitbox[i][1] + 27, AM_hitbox[i][2] + 20);
+      Waveshield.setTextSize(5);
+      Waveshield.print(String((char)AM_hitbox[i][0]));
+    } else if (AM_hitbox[i][0] == -1) {
+      //backspace button
+      Waveshield.fillRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], BLACK);
+      drawBKSP(AM_hitbox[i][1], AM_hitbox[i][2]);
+    } else if (AM_hitbox[i][0] == -2) {
+      //back button
+      drawBKbutton(AM_hitbox[i][1], AM_hitbox[i][2]);
+    } else if (AM_hitbox[i][0] == -3) {
+      //enter text
+      Waveshield.fillRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], BLACK);
+      Waveshield.setCursor(AM_hitbox[i][1] + 10, AM_hitbox[i][2] + 25);
+      Waveshield.setTextSize(3);
+      Waveshield.print("Enter");
+    } else if (AM_hitbox[i][0] == -4) {
+      //delete button
+      Waveshield.setCursor(AM_hitbox[i][1] + 15, AM_hitbox[i][2] + 15);
+      Waveshield.setTextSize(3);
+      Waveshield.print("Delete");
+    } else if (AM_hitbox[i][0] == -5) {
+      //0 - 9 button
+      Waveshield.fillRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], BLACK);
+      Waveshield.setCursor(AM_hitbox[i][1] + 15, AM_hitbox[i][2] + 15);
+      Waveshield.setTextSize(3);
+      Waveshield.print("0-9");
+    } else if (AM_hitbox[i][0] == -6) {
+      //N - Z button
+      Waveshield.fillRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], BLACK);
+      Waveshield.setCursor(AM_hitbox[i][1] + 15, AM_hitbox[i][2] + 15);
+      Waveshield.setTextSize(3);
+      Waveshield.print("N-Z");
+    }
+  }
+}
+
+void renderNZ() {
+  //set screen
+  screen = 6;
+  
+  //Render number -> adds number & updates it
+  renderNumber();
+  
+  Waveshield.fillRect(0, 200, 320, 280, YELLOW);
+  //based on the hitboxes in NZ_hitbox.
+  for (byte i = 0; i < NZ_SIZE; i++) {
+    if (NZ_hitbox[i][0] == 'Z') {
+      Waveshield.fillRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], BLACK);
+      Waveshield.setCursor(NZ_hitbox[i][1] + 42, NZ_hitbox[i][2] + 20);
+      Waveshield.setTextSize(5);
+      Waveshield.print(String((char)NZ_hitbox[i][0]));
+    } else if (NZ_hitbox[i][0] >= 0) {
+      Waveshield.fillRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], BLACK);
+      Waveshield.setCursor(NZ_hitbox[i][1] + 27, NZ_hitbox[i][2] + 20);
+      Waveshield.setTextSize(5);
+      Waveshield.print(String((char)NZ_hitbox[i][0]));
+    } else if (NZ_hitbox[i][0] == -1) {
+      //backspace button
+      Waveshield.fillRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], BLACK);
+      drawBKSP(NZ_hitbox[i][1], NZ_hitbox[i][2]);
+    } else if (NZ_hitbox[i][0] == -2) {
+      //back button
+      drawBKbutton(NZ_hitbox[i][1], NZ_hitbox[i][2]);
+    } else if (NZ_hitbox[i][0] == -3) {
+      //enter text
+      Waveshield.fillRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], BLACK);
+      Waveshield.setCursor(NZ_hitbox[i][1] + 10, NZ_hitbox[i][2] + 25);
+      Waveshield.setTextSize(3);
+      Waveshield.print("Enter");
+    } else if (NZ_hitbox[i][0] == -4) {
+      //delete button
+      Waveshield.setCursor(NZ_hitbox[i][1] + 15, NZ_hitbox[i][2] + 15);
+      Waveshield.setTextSize(3);
+      Waveshield.print("Delete");
+    } else if (NZ_hitbox[i][0] == -5) {
+      //0 - 9 button
+      Waveshield.fillRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], BLACK);
+      Waveshield.setCursor(NZ_hitbox[i][1] + 15, NZ_hitbox[i][2] + 15);
+      Waveshield.setTextSize(3);
+      Waveshield.print("0-9");
+    } else if (NZ_hitbox[i][0] == -6) {
+      //A - M button
+      Waveshield.fillRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], YELLOW);
+      Waveshield.drawRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], BLACK);
+      Waveshield.setCursor(NZ_hitbox[i][1] + 15, NZ_hitbox[i][2] + 15);
+      Waveshield.setTextSize(3);
+      Waveshield.print("A-M");
     }
   }
 }
@@ -441,12 +630,18 @@ void render() {
 
   //Draw car parking location
   Waveshield.setTextSize(2);
-  String parking_no_str = String(parking_no);
-  if (parking_no_str != "-1") {
-    Waveshield.setCursor(27, 80);
-    Waveshield.print("Your car is at lot "+parking_no_str+".");
+  if (parking_no != "") {
+    //Get width & height
+    int x1, y1; //this is always 0, 0
+    unsigned int w, h;
+    String printed = "Your car is at lot "+parking_no+".";
+    Waveshield.getTextBounds(printed, 0, 0, &x1, &y1, &w, &h);
+
+    //Set cursor to be centered
+    Waveshield.setCursor(160 - w/2, 80);
+    Waveshield.print("Your car is at lot "+parking_no+".");
   } else {
-    Waveshield.setCursor(20, 80);
+    Waveshield.setCursor(25, 80);
     Waveshield.print("You have not set a lot.");
   }
   
@@ -555,7 +750,7 @@ void doHitboxes(int scrn) {
           renderVolume();
         }
       } else if (p.x > lot_no_hb[0] && p.x < lot_no_hb[2] && p.y > lot_no_hb[1] && p.y < lot_no_hb[3]) {
-        current_number = 0;
+        current_number = "";
         renderKeypad();
       } else if (p.x > st_alm_hb[0] && p.x < st_alm_hb[2] && p.y > st_alm_hb[1] && p.y < st_alm_hb[3]) {
         //start/stop alarm
@@ -570,20 +765,26 @@ void doHitboxes(int scrn) {
   } else if (scrn == 1) {
     if (p.x >= 0 && p.y >= 0) {
       //do via keypad_hitbox
-      for (int i = 0; i < 14; i++) {
+      for (byte i = 0; i < KEYPAD_SIZE; i++) {
         if (p.x > keypad_hitbox[i][1] && p.x < keypad_hitbox[i][3] && p.y > keypad_hitbox[i][2] && p.y < keypad_hitbox[i][4]) {
           if (keypad_hitbox[i][0] >= 0) {
             //no. buttons
-            current_number = (current_number % 1000) * 10 + keypad_hitbox[i][0]; //done like this to prevent overflow (99999 will cause overflow)
+            current_number = current_number + String(keypad_hitbox[i][0]);
+
+            //remove if length > 5
+            if (current_number.length() > 5) {
+              current_number = current_number.substring(1, current_number.length());
+            }
+            
             renderNumber();
             delay(200);
           } else if (keypad_hitbox[i][0] == -2) {
             //back button
-            current_number = 0;
+            current_number = "";
             render();
           } else if (keypad_hitbox[i][0] == -1) {
             //bksp button
-            current_number /= 10;
+            current_number = current_number.substring(0, current_number.length() - 1);
             renderNumber();
             delay(200);
           } else if (keypad_hitbox[i][0] == -3) {
@@ -591,15 +792,21 @@ void doHitboxes(int scrn) {
             parking_no = current_number;
             renderLoading();
             send_data_parking();
-            current_number = 0;
+            current_number = "";
             render();
           } else if (keypad_hitbox[i][0] == -4) {
             //delete data button
-            parking_no = -1;
+            parking_no = "";
             renderLoading();
             send_data_parking();
-            current_number = 0;
+            current_number = "";
             render();
+          } else if (keypad_hitbox[i][0] == -5) {
+            //A - M button
+            renderAM();
+          } else if (AM_hitbox[i][0] == -6) {
+            //N - Z button
+            renderNZ();
           }
         }
       }
@@ -626,6 +833,104 @@ void doHitboxes(int scrn) {
         setup();
       } else if (p.x > no_btn_hb[0] && p.x < no_btn_hb[2] && p.y > no_btn_hb[1] && p.y < no_btn_hb[3]) {
         render();
+      }
+    }
+  } else if (scrn == 5) {
+    if (p.x >= 0 && p.y >= 0) {
+      //do via AM_hitbox
+      for (byte i = 0; i < AM_SIZE; i++) {
+        if (p.x > AM_hitbox[i][1] && p.x < AM_hitbox[i][3] && p.y > AM_hitbox[i][2] && p.y < AM_hitbox[i][4]) {
+          if (AM_hitbox[i][0] >= 0) {
+            //no. buttons
+            current_number = current_number + String((char)AM_hitbox[i][0]);
+
+            //remove if length > 5
+            if (current_number.length() > 5) {
+              current_number = current_number.substring(1, current_number.length());
+            }
+            
+            renderNumber();
+            delay(200);
+          } else if (AM_hitbox[i][0] == -2) {
+            //back button
+            current_number = "";
+            render();
+          } else if (AM_hitbox[i][0] == -1) {
+            //bksp button
+            current_number = current_number.substring(0, current_number.length() - 1);
+            renderNumber();
+            delay(200);
+          } else if (AM_hitbox[i][0] == -3) {
+            //enter button
+            parking_no = current_number;
+            renderLoading();
+            send_data_parking();
+            current_number = "";
+            render();
+          } else if (AM_hitbox[i][0] == -4) {
+            //delete data button
+            parking_no = "";
+            renderLoading();
+            send_data_parking();
+            current_number = "";
+            render();
+          } else if (AM_hitbox[i][0] == -5) {
+            //0 - 9 button
+            render09();
+          } else if (AM_hitbox[i][0] == -6) {
+            //N - Z button
+            renderNZ();
+          }
+        }
+      }
+    }
+  } else if (scrn == 6) {
+    if (p.x >= 0 && p.y >= 0) {
+      //do via NZ_hitbox
+      for (byte i = 0; i < NZ_SIZE; i++) {
+        if (p.x > NZ_hitbox[i][1] && p.x < NZ_hitbox[i][3] && p.y > NZ_hitbox[i][2] && p.y < NZ_hitbox[i][4]) {
+          if (NZ_hitbox[i][0] >= 0) {
+            //no. buttons
+            current_number = current_number + String((char)NZ_hitbox[i][0]);
+
+            //remove if length > 5
+            if (current_number.length() > 5) {
+              current_number = current_number.substring(1, current_number.length());
+            }
+            
+            renderNumber();
+            delay(200);
+          } else if (NZ_hitbox[i][0] == -2) {
+            //back button
+            current_number = "";
+            render();
+          } else if (NZ_hitbox[i][0] == -1) {
+            //bksp button
+            current_number = current_number.substring(0, current_number.length() - 1);
+            renderNumber();
+            delay(200);
+          } else if (NZ_hitbox[i][0] == -3) {
+            //enter button
+            parking_no = current_number;
+            renderLoading();
+            send_data_parking();
+            current_number = "";
+            render();
+          } else if (NZ_hitbox[i][0] == -4) {
+            //delete data button
+            parking_no = "";
+            renderLoading();
+            send_data_parking();
+            current_number = "";
+            render();
+          } else if (NZ_hitbox[i][0] == -5) {
+            //0 - 9 button
+            render09();
+          } else if (NZ_hitbox[i][0] == -6) {
+            //A - M button
+            renderAM();
+          }
+        }
       }
     }
   }
