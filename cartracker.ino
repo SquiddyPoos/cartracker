@@ -14,7 +14,7 @@ void turnOn() {
   digitalWrite(ON_OFF, HIGH);
   //wait for UART port -> from datasheet, minimum 4.5s. Spam "AT" and wait for "OK"
   while (!IOT.available()) {
-    IOT.write("AT");
+    IOT.write("AT\r\n");
     delay(250);
   }
   //read all
@@ -40,7 +40,7 @@ void setup() {
   digitalWrite(ON_OFF, HIGH);
   delay(100);
   turnOn();
-  Serial.println("Serial OK");
+  Serial.println("Chip OK");
 }
 
 void loop() {
