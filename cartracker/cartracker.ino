@@ -14,7 +14,7 @@ void turnOn() {
   digitalWrite(ON_OFF, HIGH);
   //wait for UART port -> from datasheet, minimum 4.5s. Spam "AT" and wait for "OK"
   while (!IOT.available()) {
-    IOT.write("AT");
+    IOT.write("AT\r\n");
     delay(250);
   }
   //read all
@@ -24,8 +24,8 @@ void turnOn() {
 }
 
 String getGPSData() {
-  IOT.write("AT+CGNSPWR=1");
-  IOT.write("AT+CGNSINF");
+  IOT.write("AT+CGNSPWR=1\r\n");
+  IOT.write("AT+CGNSINF\r\n");
   String data = "";
   while (IOT.available()) {
     data += IOT.read();
@@ -50,7 +50,7 @@ void setup() {
   digitalWrite(ON_OFF, HIGH);
   delay(100);
   turnOn();
-  Serial.println("Serial OK");
+  Serial.println("Chip OK");
 }
 
 void loop() {
