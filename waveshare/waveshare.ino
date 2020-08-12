@@ -115,9 +115,29 @@ int ok_btn_hb[4] = {120, 430, 200, 470}; //Used in the calibration screen's OK b
 int yes_btn_hb[4] = {50, 250, 150, 300}; //Used in confirmation screen
 int no_btn_hb[4] = {170, 250, 270, 300}; //Used in confirmation screen
 
-String get_parking_no() {
+String get_parking_frm_rcvr() {
+  //will actually get
   delay(1000);
-  return "";
+  return "-";
+}
+
+String get_parking_no() {
+  //grab from EEPROM if cannot connect
+  String pkng = get_parking_frm_rcvr();
+  if (pkng == "-") {
+    //locations are: 20, 21, 22, 23, 24
+    pkng = "";
+    if (EEPROM.read(20) == 255) {
+      return pkng;
+    }
+    pkng += (char)EEPROM.read(20);
+    pkng += (char)EEPROM.read(21);
+    pkng += (char)EEPROM.read(22);
+    pkng += (char)EEPROM.read(23);
+    pkng += (char)EEPROM.read(24);
+    pkng.trim(); //remove any trailing whitespace
+  }
+  return pkng;
 }
 
 bool is_alarm_on() {
@@ -126,11 +146,18 @@ bool is_alarm_on() {
 }
 
 void send_data_alm() {
-  delay(10000);
+  delay(3000);
 }
 
 void send_data_parking() {
-  delay(10000);
+  for (int i = 20; i < 25; i++) {
+    if (i < 20 + parking_no.length()) {
+      EEPROM.update(i, parking_no[i - 20]);
+    } else {
+      EEPROM.update(i, ' ');
+    }
+  }
+  delay(3000);
 }
 
 void resetEEPROM() {
