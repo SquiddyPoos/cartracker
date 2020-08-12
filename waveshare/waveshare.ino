@@ -198,7 +198,7 @@ TSConfigData getCalibrationData() {
 void writeCalibrationData() {
   TSConfigData tscd = Waveshield.getTsConfigData();
   int tscd_int[4] = {tscd.xMin, tscd.xMax, tscd.yMin, tscd.yMax};
-  for (int i = 8; i >= 1; i--) {
+  for (int i = 8; i > 0; i--) {
     EEPROM.update(i, tscd_int[(i - 1) / 2] & 255);
     tscd_int[(i - 1) / 2] >>= 8;
   }
@@ -321,9 +321,9 @@ void renderCalibration() {
   Waveshield.setCursor(7, 80);
   Waveshield.setTextSize(1);
   Waveshield.print("Press 'OK' when the red dot is close to the stylus.");
-  Waveshield.setCursor(10, 95);
+  Waveshield.setCursor(7, 95);
   Waveshield.setTextSize(1);
-  Waveshield.print("    This screen will refresh every 10 seconds.");
+  Waveshield.print("    This screen will refresh every 2.5 seconds.");
 
   //add ok button
   Waveshield.fillRoundRect(ok_btn_hb[0], ok_btn_hb[1], ok_btn_hb[2] - ok_btn_hb[0], ok_btn_hb[3] - ok_btn_hb[1], 4, YELLOW);
@@ -746,8 +746,9 @@ void doHitboxes(int scrn) {
   TSPoint p = Waveshield.getPoint();
   Waveshield.normalizeTsPoint(p);
 
-  if (scrn == 0) {
-    if (p.x >= 0 && p.y >= 0) {
+  //check if press ok
+  if (p.x >= 0 && p.y >= 0 && Waveshield.pressure() > 50) {
+    if (scrn == 0) {
       //sound btn
       if (p.x > snd_btn_hb[0] && p.x < snd_btn_hb[2] && p.y > snd_btn_hb[1] && p.y < snd_btn_hb[3]) {
         sound = !sound;
@@ -788,9 +789,7 @@ void doHitboxes(int scrn) {
       } else if (p.x > reset_btn_hb[0] && p.x < reset_btn_hb[2] && p.y > reset_btn_hb[1] && p.y < reset_btn_hb[3]) {
         renderConfirmation();
       }
-    }
-  } else if (scrn == 1) {
-    if (p.x >= 0 && p.y >= 0) {
+    } else if (scrn == 1) {
       //do via keypad_hitbox
       for (byte i = 0; i < KEYPAD_SIZE; i++) {
         if (p.x > keypad_hitbox[i][1] && p.x < keypad_hitbox[i][3] && p.y > keypad_hitbox[i][2] && p.y < keypad_hitbox[i][4]) {
@@ -837,22 +836,15 @@ void doHitboxes(int scrn) {
           }
         }
       }
-    }
-  } else if (scrn == 2) {
-    if (p.x >= 0 && p.y >= 0) {
+    } else if (scrn == 2) {
       if (p.x > ok_btn_hb[0] && p.x < ok_btn_hb[2] && p.y > ok_btn_hb[1] && p.y < ok_btn_hb[3]) {
         //ok button on the calibration screen
         writeCalibrationData();
         render();
       } else {
-        Waveshield.fillCircle(p.x, p.y, 4, RED);
+        Waveshield.fillCircle(p.x, p.y, 2, RED);
       }
-    }
-    if (millis() % 10000 == 0) {
-      renderCalibration();
-    }
-  } else if (scrn == 4) {
-    if (p.x >= 0 && p.y >= 0) {
+    } else if (scrn == 4) {
       if (p.x > yes_btn_hb[0] && p.x < yes_btn_hb[2] && p.y > yes_btn_hb[1] && p.y < yes_btn_hb[3]) {
         //yes button on confirmation screen
         EEPROM.update(0, 255);
@@ -861,9 +853,7 @@ void doHitboxes(int scrn) {
       } else if (p.x > no_btn_hb[0] && p.x < no_btn_hb[2] && p.y > no_btn_hb[1] && p.y < no_btn_hb[3]) {
         render();
       }
-    }
-  } else if (scrn == 5) {
-    if (p.x >= 0 && p.y >= 0) {
+    } else if (scrn == 5) {
       //do via AM_hitbox
       for (byte i = 0; i < AM_SIZE; i++) {
         if (p.x > AM_hitbox[i][1] && p.x < AM_hitbox[i][3] && p.y > AM_hitbox[i][2] && p.y < AM_hitbox[i][4]) {
@@ -910,9 +900,7 @@ void doHitboxes(int scrn) {
           }
         }
       }
-    }
-  } else if (scrn == 6) {
-    if (p.x >= 0 && p.y >= 0) {
+    } else if (scrn == 6) {
       //do via NZ_hitbox
       for (byte i = 0; i < NZ_SIZE; i++) {
         if (p.x > NZ_hitbox[i][1] && p.x < NZ_hitbox[i][3] && p.y > NZ_hitbox[i][2] && p.y < NZ_hitbox[i][4]) {
@@ -971,6 +959,9 @@ void setup() {
   //Set portrait
   Waveshield.setRotation(0);
 
+  //turn off idle mode
+  Waveshield.setIdleMode(false);
+
   //render loading scrn
   renderLoading();
 
@@ -997,4 +988,7 @@ void setup() {
 
 void loop() {
   doHitboxes(screen);
+  if (screen == 2 && millis() % 2500 == 0) {
+    renderCalibration();
+  }
 }
