@@ -2,7 +2,14 @@
 #include <Adafruit_GFX.h>
 #include <Waveshare_ILI9486.h>
 #include <EEPROM.h>
+#include <nRF24L01.h>
+#include <RF24.h>
 
+//The IR module also uses SPI
+//SPI is done by connecting to pins 11 -> IR MISO, 12 -> IR MOSI, 13 -> SCK
+//A0 for CSN (Chip select, but active low)
+#define IR_CSN A0
+#define IR_CE A1
 
 // Assign human-readable names to some common 16-bit color values:
 #define BLACK   0x0000
@@ -21,6 +28,10 @@
 #define NZ_SIZE     19
 
 Waveshare_ILI9486 Waveshield;
+RF24 IR(IR_CE, IR_CSN);
+
+const byte IR_ADDR_W[6] = "00001";
+const byte IR_ADDR_R[6] = "00002";
 
 bool sound = true;
 int volume = 100;
@@ -146,7 +157,13 @@ bool is_alarm_on() {
 }
 
 void send_data_alm() {
-  delay(3000);
+  const char text[] = alarm_on ? "ALM ON" : "ALM OFF";
+  bool result = IR.write(&text, sizeof(text)));
+  if (!result) {
+    alarm_on = !alarm_on;
+    renderFailed();
+    delay(2000);
+  }
 }
 
 void send_data_parking() {
@@ -345,6 +362,20 @@ void renderLoading() {
   Waveshield.setTextSize(4);
   Waveshield.setCursor(50, 200);
   Waveshield.print("Working...");
+}
+
+void renderFailed() {
+  //Set screen
+  screen = 3;
+  
+  //Set colour
+  Waveshield.fillScreen(LBLUE);
+  Waveshield.setTextColor(BLACK);
+
+  //Draw loading
+  Waveshield.setTextSize(3);
+  Waveshield.setCursor(50, 200);
+  Waveshield.print("Transmission failed.");
 }
 
 void renderNumber() {
@@ -955,9 +986,17 @@ void setup() {
   //Initialise
   SPI.begin();
   Waveshield.begin();
+  IR.begin();
+  IR.openWritingPipe(IR_ADDR_W);
+  IR.openReadingPipe(0, IR_ADDR_R);
+  IR.setPALevel(RF24_PA_MIN);
+  IR.startListening();
 
   //Set portrait
   Waveshield.setRotation(0);
+
+  //Set brightness
+  Waveshield.setScreenBrightness(255);
 
   //turn off idle mode
   Waveshield.setIdleMode(false);
