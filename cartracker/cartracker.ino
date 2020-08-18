@@ -12,9 +12,10 @@
 #define IR_CE 2
 
 #define BUZ_PIN 9
-#define LED_PIN 8
+#define LED_PIN 10
 
-#define BLK_DUR 32767
+#define BLK_DUR 5000
+#define BUZ_DUR 20000
 
 SoftwareSerial IOT(RX_PIN, TX_PIN);
 RF24 IR(IR_CE, IR_CSN);
@@ -22,10 +23,12 @@ RF24 IR(IR_CE, IR_CSN);
 const byte IR_ADDR_R[6] = "00001";
 const byte IR_ADDR_W[6] = "00002";
 
-bool blinkOn = true;
-bool lightOn = true;
-bool buzzerOn = true;
+bool blinkOn = false;
+bool masterBuzOn = false;
+bool lightOn = false;
+bool buzzerOn = false;
 int toNextBlink = BLK_DUR;
+int toNextBuzzerOff = BUZ_DUR;
 
 void turnOn() {
   //pulse off then on
@@ -66,6 +69,7 @@ void checkIR() {
   if (IR.available()) {
     char text[] = "";
     IR.read(&text, sizeof(text));
+    Serial.println(text);
     if (text == "GET ALM") {
       char text[] = "0";
       IR.write(&text, sizeof(text));
@@ -75,10 +79,11 @@ void checkIR() {
 
 void alarmOn(bool buzzer, bool light) {
   if (buzzer) {
-    analogWrite(BUZ_PIN, 512);
+    tone(BUZ_PIN, 512);
+  } else {
+    noTone(BUZ_PIN);
   }
   if (light) {
-    Serial.println("LGT");
     digitalWrite(LED_PIN, HIGH);
   } else {
     digitalWrite(LED_PIN, LOW);
@@ -95,10 +100,14 @@ void setup() {
   IR.startListening();
   pinMode(ON_OFF, OUTPUT);
   //pinMode(SLEEP_PIN, OUTPUT);
+  pinMode(A0, OUTPUT);
+  pinMode(A1, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
   digitalWrite(ON_OFF, HIGH);
   digitalWrite(A0, LOW);
   digitalWrite(A1, LOW);
-  digitalWrite(A2, HIGH);
+  digitalWrite(LED_PIN, LOW);
+  noTone(BUZ_PIN);
   delay(100);
   turnOn();
   Serial.println("Chip OK");
@@ -111,9 +120,19 @@ void loop() {
     toNextBlink--;
   }
 
+  if (masterBuzOn) {
+    toNextBuzzerOff--;
+  }
+
   if (toNextBlink <= 0) {
     lightOn = !lightOn;
     alarmOn(buzzerOn, lightOn);
     toNextBlink = BLK_DUR;
+  }
+
+  if (toNextBuzzerOff <= 0) {
+    buzzerOn = !buzzerOn;
+    alarmOn(buzzerOn, lightOn);
+    toNextBuzzerOff = BUZ_DUR;
   }
 }

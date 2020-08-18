@@ -152,13 +152,37 @@ String get_parking_no() {
 }
 
 bool is_alarm_on() {
-  delay(100);
-  return false;
+  const char text[] = "GET ALM";
+  bool result = IR.write(&text, sizeof(text));
+  if (!result) {
+    renderFailed();
+    delay(2000);
+    return false;
+  }
+  int wait = 50;
+  while (!IR.available() && wait > 0) {
+    //Wait for a max of 5s.
+    delay(100);
+    wait--;
+  }
+  if (IR.available()) {
+    char text[] = "";
+    IR.read(&text, sizeof(text));
+    if (text == "0") {
+      return false;
+    } else {
+      return true;
+    }
+  } else {
+    renderFailed();
+  }
 }
 
 void send_data_alm() {
-  const char text[] = alarm_on ? "ALM ON" : "ALM OFF";
-  bool result = IR.write(&text, sizeof(text)));
+  String text = (alarm_on) ? ("ALM Y") : ("ALM N");
+  char text_ch[] = "";
+  text.toCharArray(text_ch, text.length());
+  bool result = IR.write(&text_ch, sizeof(text_ch));
   if (!result) {
     alarm_on = !alarm_on;
     renderFailed();
@@ -373,9 +397,9 @@ void renderFailed() {
   Waveshield.setTextColor(BLACK);
 
   //Draw loading
-  Waveshield.setTextSize(3);
-  Waveshield.setCursor(50, 200);
-  Waveshield.print("Transmission failed.");
+  Waveshield.setTextSize(2);
+  Waveshield.setCursor(45, 200);
+  Waveshield.print("Failed transmission.");
 }
 
 void renderNumber() {
