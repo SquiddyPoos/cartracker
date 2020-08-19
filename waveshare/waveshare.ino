@@ -11,8 +11,6 @@
 #define IR_CSN A0
 #define IR_CE A1
 
-#define NO_TRIES 50
-
 // Assign human-readable names to some common 16-bit color values:
 #define BLACK   0x0000
 #define BLUE    0x001F
@@ -137,9 +135,8 @@ String get_parking_frm_rcvr() {
 bool sendIRData(char* text, int tsize) {
   bool done = false;
   IR.stopListening();
-  for (int i = 0; !done && i < NO_TRIES; i++) {
-    done = IR.write(&text, tsize);
-  }
+  Serial.write(text);
+  done = IR.write(&text, tsize);
   IR.startListening();
   return done;
 }
@@ -165,6 +162,7 @@ String get_parking_no() {
 
 bool is_alarm_on() {
   char text[] = "GET ALM";
+  IR.write(&text, sizeof(text));
   bool result = sendIRData(text, sizeof(text));
   if (!result) {
     renderFailed();
@@ -1024,9 +1022,11 @@ void setup() {
   //Initialise
   SPI.begin();
   Waveshield.begin();
+  Serial.begin(9600);
   IR.begin();
   IR.openWritingPipe(IR_ADDR_W);
-  IR.openReadingPipe(0, IR_ADDR_R);
+  IR.openReadingPipe(1, IR_ADDR_R);
+  IR.startListening();
 
   //Set portrait
   Waveshield.setRotation(0);
