@@ -14,6 +14,8 @@
 #define BUZ_PIN 9
 #define LED_PIN 10
 
+#define NO_TRIES 50
+
 #define BLK_DUR 5000
 #define BUZ_DUR 20000
 
@@ -29,6 +31,16 @@ bool lightOn = false;
 bool buzzerOn = false;
 int toNextBlink = BLK_DUR;
 int toNextBuzzerOff = BUZ_DUR;
+
+bool sendIRData(char* text, int tsize) {
+  bool done = false;
+  IR.stopListening();
+  for (int i = 0; !done && i < NO_TRIES; i++) {
+    done = IR.write(&text, tsize);
+  }
+  IR.startListening();
+  return done;
+}
 
 void turnOn() {
   //pulse off then on
@@ -72,7 +84,7 @@ void checkIR() {
     Serial.println(text);
     if (text == "GET ALM") {
       char text[] = "0";
-      IR.write(&text, sizeof(text));
+      sendIRData(text, sizeof(text));
     }
   }
 }
@@ -97,7 +109,6 @@ void setup() {
   IR.openReadingPipe(0, IR_ADDR_R);
   IR.openWritingPipe(IR_ADDR_W);
   IR.setPALevel(RF24_PA_MIN);
-  IR.startListening();
   pinMode(ON_OFF, OUTPUT);
   //pinMode(SLEEP_PIN, OUTPUT);
   pinMode(A0, OUTPUT);

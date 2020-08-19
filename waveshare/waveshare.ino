@@ -11,6 +11,8 @@
 #define IR_CSN A0
 #define IR_CE A1
 
+#define NO_TRIES 50
+
 // Assign human-readable names to some common 16-bit color values:
 #define BLACK   0x0000
 #define BLUE    0x001F
@@ -132,6 +134,16 @@ String get_parking_frm_rcvr() {
   return "-";
 }
 
+bool sendIRData(char* text, int tsize) {
+  bool done = false;
+  IR.stopListening();
+  for (int i = 0; !done && i < NO_TRIES; i++) {
+    done = IR.write(&text, tsize);
+  }
+  IR.startListening();
+  return done;
+}
+
 String get_parking_no() {
   //grab from EEPROM if cannot connect
   String pkng = get_parking_frm_rcvr();
@@ -152,8 +164,8 @@ String get_parking_no() {
 }
 
 bool is_alarm_on() {
-  const char text[] = "GET ALM";
-  bool result = IR.write(&text, sizeof(text));
+  char text[] = "GET ALM";
+  bool result = sendIRData(text, sizeof(text));
   if (!result) {
     renderFailed();
     delay(2000);
@@ -175,6 +187,8 @@ bool is_alarm_on() {
     }
   } else {
     renderFailed();
+    delay(2000);
+    return false;
   }
 }
 
@@ -182,7 +196,7 @@ void send_data_alm() {
   String text = (alarm_on) ? ("ALM Y") : ("ALM N");
   char text_ch[] = "";
   text.toCharArray(text_ch, text.length());
-  bool result = IR.write(&text_ch, sizeof(text_ch));
+  bool result = sendIRData(text_ch, sizeof(text_ch));
   if (!result) {
     alarm_on = !alarm_on;
     renderFailed();
@@ -1013,8 +1027,6 @@ void setup() {
   IR.begin();
   IR.openWritingPipe(IR_ADDR_W);
   IR.openReadingPipe(0, IR_ADDR_R);
-  IR.setPALevel(RF24_PA_MIN);
-  IR.startListening();
 
   //Set portrait
   Waveshield.setRotation(0);
