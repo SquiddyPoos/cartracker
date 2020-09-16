@@ -1,7 +1,8 @@
-#include <SoftwareSerial.h>
+//#include <SoftwareSerial.h>
 #include <SPI.h>
 #include <RF24.h>
 #include <nRF24L01.h>
+#include <EEPROM.h>
 
 #define RX_PIN 4
 #define TX_PIN 5
@@ -17,7 +18,7 @@
 #define BLK_DUR 5000
 #define BUZ_DUR 20000
 
-SoftwareSerial IOT(RX_PIN, TX_PIN);
+//SoftwareSerial IOT(RX_PIN, TX_PIN);
 RF24 IR(IR_CE, IR_CSN);
 
 const byte IR_ADDR_R[6] = "00001";
@@ -38,7 +39,7 @@ bool sendIRData(char* text, int tsize) {
   return done;
 }
 
-void turnOn() {
+/*void turnOn() {
   //pulse off then on
   digitalWrite(ON_OFF, LOW);
   delay(1050); //At least 1s (datasheet)
@@ -53,9 +54,9 @@ void turnOn() {
   while (IOT.available()) {
     IOT.read();
   }
-}
+}*/
 
-String getGPSData() {
+/*String getGPSData() {
   IOT.write("AT+CGNSPWR=1\r\n");
   IOT.write("AT+CGNSINF\r\n");
   String data = "";
@@ -63,7 +64,7 @@ String getGPSData() {
     data += IOT.read();
   }
   return data;
-}
+}*/
 
 void sleepOn() {
   digitalWrite(SLEEP_PIN, HIGH);
@@ -73,14 +74,45 @@ void sleepOff() {
   digitalWrite(SLEEP_PIN, LOW);
 }
 
+void writeAlm(bool onOff) {
+  EEPROM.write(0, onOff);
+}
+
+bool getAlm() {
+  int onoff = EEPROM.read(0);
+  if (onoff == 255) {
+    EEPROM.update(0, 0);
+    onoff = 0;
+  }
+  return onoff;
+}
+
 void checkIR() {
   if (IR.available()) {
-    char text[] = "";
-    IR.read(&text, sizeof(text));
-    Serial.println(text);
-    if (text == "GET ALM") {
-      char text[] = "0";
-      sendIRData(text, sizeof(text));
+    char text[32];
+    IR.read(&text, 32);
+    String stext = String(text);
+    Serial.println("T: "+stext);
+    if (stext == "GET ALM") {
+      char text[] = {0};
+      String(getAlm()).toCharArray(text, 1);
+      Serial.println(sendIRData(text, sizeof(text)));
+    } else if (stext.substring(0, 7) == "SET ALM") {
+      Serial.print("DETECT SET");
+      bool onoff = stext[8] - 'A'; //A -> false, B -> true
+      if (!onoff) {
+        buzzerOn = false;
+        lightOn = false;
+        blinkOn = false;
+        masterBuzOn = false;
+        toNextBlink = BLK_DUR;
+        toNextBuzzerOff = BUZ_DUR;
+      } else {
+        masterBuzOn = stext[9] - 'A'; // buzzer on/off
+        lightOn = stext[10] - 'A'; // light
+        blinkOn = stext[11] - 'A'; // blink
+      }
+      writeAlm(onoff);
     }
   }
 }
@@ -100,7 +132,7 @@ void alarmOn(bool buzzer, bool light) {
 
 void setup() {
   Serial.begin(9600);
-  IOT.begin(9600);
+  //IOT.begin(9600);
   IR.begin();
   IR.openReadingPipe(1, IR_ADDR_R);
   IR.openWritingPipe(IR_ADDR_W);
@@ -116,8 +148,9 @@ void setup() {
   digitalWrite(LED_PIN, LOW);
   noTone(BUZ_PIN);
   delay(100);
-  turnOn();
+  //turnOn();
   Serial.println("Chip OK");
+  Serial.println(IR.isChipConnected());
 }
 
 void loop() {

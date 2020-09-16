@@ -135,7 +135,6 @@ String get_parking_frm_rcvr() {
 bool sendIRData(char* text, int tsize) {
   bool done = false;
   IR.stopListening();
-  Serial.write(text);
   done = IR.write(&text, tsize);
   IR.startListening();
   return done;
@@ -190,11 +189,21 @@ bool is_alarm_on() {
   }
 }
 
+char boolConv(bool b) {
+  return (b) ? ('B') : ('A');
+}
+
 void send_data_alm() {
-  String text = (alarm_on) ? ("ALM Y") : ("ALM N");
-  char text_ch[] = "";
-  text.toCharArray(text_ch, text.length());
-  bool result = sendIRData(text_ch, sizeof(text_ch));
+  char text[32] = "";
+  if (alarm_on) {
+    text += "SET ALM B";
+    text += boolConv(sound);
+    text += boolConv(light);
+    text += boolConv(lblink);
+  } else {
+    text += "SET ALM A";
+  }
+  bool result = sendIRData(text, sizeof(text));
   if (!result) {
     alarm_on = !alarm_on;
     renderFailed();
