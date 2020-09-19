@@ -1,4 +1,4 @@
-//#include <SoftwareSerial.h>
+#include <SoftwareSerial.h>
 #include <SPI.h>
 #include <RF24.h>
 #include <nRF24L01.h>
@@ -9,8 +9,9 @@
 #define SLEEP_PIN 7
 #define ON_OFF 6
 
-#define IR_CSN 3
-#define IR_CE 2
+#define LO_RX_PIN 3
+#define LO_TX_PIN 2
+#define LO_SET 13
 
 #define BUZ_PIN 9
 #define LED_PIN 10
@@ -18,8 +19,8 @@
 #define BLK_DUR 5000
 #define BUZ_DUR 20000
 
-//SoftwareSerial IOT(RX_PIN, TX_PIN);
-RF24 IR(IR_CE, IR_CSN);
+SoftwareSerial IOT(RX_PIN, TX_PIN);
+SoftwareSerial lora(LO_RX_PIN, LO_TX_PIN);
 
 const byte IR_ADDR_R[6] = "00001";
 const byte IR_ADDR_W[6] = "00002";
@@ -30,14 +31,6 @@ bool lightOn = false;
 bool buzzerOn = false;
 int toNextBlink = BLK_DUR;
 int toNextBuzzerOff = BUZ_DUR;
-
-bool sendIRData(char* text, int tsize) {
-  bool done = false;
-  IR.stopListening();
-  done = IR.write(&text, tsize);
-  IR.startListening();
-  return done;
-}
 
 /*void turnOn() {
   //pulse off then on
@@ -87,33 +80,9 @@ bool getAlm() {
   return onoff;
 }
 
-void checkIR() {
-  if (IR.available()) {
-    char text[32];
-    IR.read(&text, 32);
-    String stext = String(text);
-    Serial.println("T: "+stext);
-    if (stext == "GET ALM") {
-      char text[] = {0};
-      String(getAlm()).toCharArray(text, 1);
-      Serial.println(sendIRData(text, sizeof(text)));
-    } else if (stext.substring(0, 7) == "SET ALM") {
-      Serial.print("DETECT SET");
-      bool onoff = stext[8] - 'A'; //A -> false, B -> true
-      if (!onoff) {
-        buzzerOn = false;
-        lightOn = false;
-        blinkOn = false;
-        masterBuzOn = false;
-        toNextBlink = BLK_DUR;
-        toNextBuzzerOff = BUZ_DUR;
-      } else {
-        masterBuzOn = stext[9] - 'A'; // buzzer on/off
-        lightOn = stext[10] - 'A'; // light
-        blinkOn = stext[11] - 'A'; // blink
-      }
-      writeAlm(onoff);
-    }
+void checkLO() {
+  if (lora.available()) {
+    Serial.write(lora.read());
   }
 }
 
@@ -132,29 +101,30 @@ void alarmOn(bool buzzer, bool light) {
 
 void setup() {
   Serial.begin(9600);
-  //IOT.begin(9600);
-  IR.begin();
-  IR.openReadingPipe(1, IR_ADDR_R);
-  IR.openWritingPipe(IR_ADDR_W);
-  IR.startListening();
+  IOT.begin(9600);
+  lora.begin(9600);
+  lora.listen();
   pinMode(ON_OFF, OUTPUT);
   //pinMode(SLEEP_PIN, OUTPUT);
   pinMode(A0, OUTPUT);
   pinMode(A1, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
+  pinMode(LO_SET, OUTPUT);
   digitalWrite(ON_OFF, HIGH);
   digitalWrite(A0, LOW);
   digitalWrite(A1, LOW);
   digitalWrite(LED_PIN, LOW);
+  digitalWrite(LO_SET, LOW);
+  lora.print("AA FA AA\r\n");
+  Serial.print(lora.available());
   noTone(BUZ_PIN);
   delay(100);
   //turnOn();
   Serial.println("Chip OK");
-  Serial.println(IR.isChipConnected());
 }
 
 void loop() {
-  checkIR();
+  checkLO();
 
   if (blinkOn) {
     toNextBlink--;
