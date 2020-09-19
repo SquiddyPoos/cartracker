@@ -2,14 +2,11 @@
 #include <Adafruit_GFX.h>
 #include <Waveshare_ILI9486.h>
 #include <EEPROM.h>
-#include <nRF24L01.h>
-#include <RF24.h>
+#include <SoftwareSerial.h>
 
-//The IR module also uses SPI
-//SPI is done by connecting to pins 11 -> IR MISO, 12 -> IR MOSI, 13 -> SCK
-//A0 for CSN (Chip select, but active low)
-#define IR_CSN A0
-#define IR_CE A1
+#define LO_RX_PIN A0
+#define LO_TX_PIN A1
+#define LO_SET A2
 
 // Assign human-readable names to some common 16-bit color values:
 #define BLACK   0x0000
@@ -28,7 +25,7 @@
 #define NZ_SIZE     19
 
 Waveshare_ILI9486 Waveshield;
-RF24 IR(IR_CE, IR_CSN);
+SoftwareSerial lora(LO_RX_PIN, LO_TX_PIN);
 
 const byte IR_ADDR_W[6] = "00001";
 const byte IR_ADDR_R[6] = "00002";
@@ -132,14 +129,6 @@ String get_parking_frm_rcvr() {
   return "-";
 }
 
-bool sendIRData(char* text, int tsize) {
-  bool done = false;
-  IR.stopListening();
-  done = IR.write(&text, tsize);
-  IR.startListening();
-  return done;
-}
-
 String get_parking_no() {
   //grab from EEPROM if cannot connect
   String pkng = get_parking_frm_rcvr();
@@ -159,58 +148,6 @@ String get_parking_no() {
   return pkng;
 }
 
-bool is_alarm_on() {
-  char text[] = "GET ALM";
-  IR.write(&text, sizeof(text));
-  bool result = sendIRData(text, sizeof(text));
-  if (!result) {
-    renderFailed();
-    delay(2000);
-    return false;
-  }
-  int wait = 50;
-  while (!IR.available() && wait > 0) {
-    //Wait for a max of 5s.
-    delay(100);
-    wait--;
-  }
-  if (IR.available()) {
-    char text[] = "";
-    IR.read(&text, sizeof(text));
-    if (text == "0") {
-      return false;
-    } else {
-      return true;
-    }
-  } else {
-    renderFailed();
-    delay(2000);
-    return false;
-  }
-}
-
-char boolConv(bool b) {
-  return (b) ? ('B') : ('A');
-}
-
-void send_data_alm() {
-  char text[32] = "";
-  if (alarm_on) {
-    text += "SET ALM B";
-    text += boolConv(sound);
-    text += boolConv(light);
-    text += boolConv(lblink);
-  } else {
-    text += "SET ALM A";
-  }
-  bool result = sendIRData(text, sizeof(text));
-  if (!result) {
-    alarm_on = !alarm_on;
-    renderFailed();
-    delay(2000);
-  }
-}
-
 void send_data_parking() {
   for (int i = 20; i < 25; i++) {
     if (i < 20 + parking_no.length()) {
@@ -220,6 +157,17 @@ void send_data_parking() {
     }
   }
   delay(3000);
+}
+
+void send_data_alm() {
+  //send alarm_on, along with sound, light & lblink
+  delay(1000);
+}
+
+bool is_alarm_on() {
+  //get from rcvr
+  delay(100);
+  return false;
 }
 
 void resetEEPROM() {
@@ -348,7 +296,7 @@ void drawBKbutton(int x, int y) {
   //back
   Waveshield.setCursor(x + 50, y + 15);
   Waveshield.setTextSize(3);
-  Waveshield.print("Back");
+  Waveshield.print(F("Back"));
 }
 
 String correct_format(String no, int len) {
@@ -371,28 +319,28 @@ void renderCalibration() {
   //Print text -> first time calibration
   Waveshield.setCursor(30, 20);
   Waveshield.setTextSize(2);
-  Waveshield.print("First Time Calibration");
+  Waveshield.print(F("First Time Calibration"));
 
   //add explanation
   Waveshield.setCursor(60, 50);
   Waveshield.setTextSize(1);
-  Waveshield.print("Move stylus out of bounds over all");
+  Waveshield.print(F("Move stylus out of bounds over all"));
   Waveshield.setCursor(60, 65);
   Waveshield.setTextSize(1);
-  Waveshield.print("      4 edges to calibrate.");
+  Waveshield.print(F("      4 edges to calibrate."));
   Waveshield.setCursor(7, 80);
   Waveshield.setTextSize(1);
-  Waveshield.print("Press 'OK' when the red dot is close to the stylus.");
+  Waveshield.print(F("Press 'OK' when the red dot is close to the stylus."));
   Waveshield.setCursor(7, 95);
   Waveshield.setTextSize(1);
-  Waveshield.print("    This screen will refresh every 2.5 seconds.");
+  Waveshield.print(F("    This screen will refresh every 2.5 seconds."));
 
   //add ok button
   Waveshield.fillRoundRect(ok_btn_hb[0], ok_btn_hb[1], ok_btn_hb[2] - ok_btn_hb[0], ok_btn_hb[3] - ok_btn_hb[1], 4, YELLOW);
   Waveshield.drawRoundRect(ok_btn_hb[0], ok_btn_hb[1], ok_btn_hb[2] - ok_btn_hb[0], ok_btn_hb[3] - ok_btn_hb[1], 4, BLACK);
   Waveshield.setCursor(ok_btn_hb[0] + 23, ok_btn_hb[1] + 10);
   Waveshield.setTextSize(3);
-  Waveshield.print("OK");
+  Waveshield.print(F("OK"));
 }
 
 void renderLoading() {
@@ -406,7 +354,7 @@ void renderLoading() {
   //Draw loading
   Waveshield.setTextSize(4);
   Waveshield.setCursor(50, 200);
-  Waveshield.print("Working...");
+  Waveshield.print(F("Working..."));
 }
 
 void renderFailed() {
@@ -420,7 +368,7 @@ void renderFailed() {
   //Draw loading
   Waveshield.setTextSize(2);
   Waveshield.setCursor(45, 200);
-  Waveshield.print("Failed transmission.");
+  Waveshield.print(F("Failed transmission."));
 }
 
 void renderNumber() {
@@ -442,9 +390,9 @@ void renderKeypad() {
   //draw prompt box
   Waveshield.setCursor(65, 90);
   Waveshield.setTextSize(3);
-  Waveshield.print(" Enter New ");
+  Waveshield.print(F(" Enter New "));
   Waveshield.setCursor(65, 120);
-  Waveshield.print("Parking Lot");
+  Waveshield.print(F("Parking Lot"));
 
   //draw box for number on top
   Waveshield.fillRect(0, 150, 320, 50, YELLOW);
@@ -491,26 +439,26 @@ void render09() {
       Waveshield.drawRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], BLACK);
       Waveshield.setCursor(keypad_hitbox[i][1] + 10, keypad_hitbox[i][2] + 25);
       Waveshield.setTextSize(3);
-      Waveshield.print("Enter");
+      Waveshield.print(F("Enter"));
     } else if (keypad_hitbox[i][0] == -4) {
       //delete button
       Waveshield.setCursor(keypad_hitbox[i][1] + 15, keypad_hitbox[i][2] + 15);
       Waveshield.setTextSize(3);
-      Waveshield.print("Delete");
+      Waveshield.print(F("Delete"));
     } else if (keypad_hitbox[i][0] == -5) {
       //A - M button
       Waveshield.fillRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], YELLOW);
       Waveshield.drawRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], BLACK);
       Waveshield.setCursor(keypad_hitbox[i][1] + 15, keypad_hitbox[i][2] + 15);
       Waveshield.setTextSize(3);
-      Waveshield.print("A-M");
+      Waveshield.print(F("A-M"));
     } else if (keypad_hitbox[i][0] == -6) {
       //N - Z button
       Waveshield.fillRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], YELLOW);
       Waveshield.drawRect(keypad_hitbox[i][1], keypad_hitbox[i][2], keypad_hitbox[i][3] - keypad_hitbox[i][1], keypad_hitbox[i][4] - keypad_hitbox[i][2], BLACK);
       Waveshield.setCursor(keypad_hitbox[i][1] + 15, keypad_hitbox[i][2] + 15);
       Waveshield.setTextSize(3);
-      Waveshield.print("N-Z");
+      Waveshield.print(F("N-Z"));
     }
   }
 }
@@ -551,26 +499,26 @@ void renderAM() {
       Waveshield.drawRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], BLACK);
       Waveshield.setCursor(AM_hitbox[i][1] + 10, AM_hitbox[i][2] + 25);
       Waveshield.setTextSize(3);
-      Waveshield.print("Enter");
+      Waveshield.print(F("Enter"));
     } else if (AM_hitbox[i][0] == -4) {
       //delete button
       Waveshield.setCursor(AM_hitbox[i][1] + 15, AM_hitbox[i][2] + 15);
       Waveshield.setTextSize(3);
-      Waveshield.print("Delete");
+      Waveshield.print(F("Delete"));
     } else if (AM_hitbox[i][0] == -5) {
       //0 - 9 button
       Waveshield.fillRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], YELLOW);
       Waveshield.drawRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], BLACK);
       Waveshield.setCursor(AM_hitbox[i][1] + 15, AM_hitbox[i][2] + 15);
       Waveshield.setTextSize(3);
-      Waveshield.print("0-9");
+      Waveshield.print(F("0-9"));
     } else if (AM_hitbox[i][0] == -6) {
       //N - Z button
       Waveshield.fillRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], YELLOW);
       Waveshield.drawRect(AM_hitbox[i][1], AM_hitbox[i][2], AM_hitbox[i][3] - AM_hitbox[i][1], AM_hitbox[i][4] - AM_hitbox[i][2], BLACK);
       Waveshield.setCursor(AM_hitbox[i][1] + 15, AM_hitbox[i][2] + 15);
       Waveshield.setTextSize(3);
-      Waveshield.print("N-Z");
+      Waveshield.print(F("N-Z"));
     }
   }
 }
@@ -611,26 +559,26 @@ void renderNZ() {
       Waveshield.drawRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], BLACK);
       Waveshield.setCursor(NZ_hitbox[i][1] + 10, NZ_hitbox[i][2] + 25);
       Waveshield.setTextSize(3);
-      Waveshield.print("Enter");
+      Waveshield.print(F("Enter"));
     } else if (NZ_hitbox[i][0] == -4) {
       //delete button
       Waveshield.setCursor(NZ_hitbox[i][1] + 15, NZ_hitbox[i][2] + 15);
       Waveshield.setTextSize(3);
-      Waveshield.print("Delete");
+      Waveshield.print(F("Delete"));
     } else if (NZ_hitbox[i][0] == -5) {
       //0 - 9 button
       Waveshield.fillRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], YELLOW);
       Waveshield.drawRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], BLACK);
       Waveshield.setCursor(NZ_hitbox[i][1] + 15, NZ_hitbox[i][2] + 15);
       Waveshield.setTextSize(3);
-      Waveshield.print("0-9");
+      Waveshield.print(F("0-9"));
     } else if (NZ_hitbox[i][0] == -6) {
       //A - M button
       Waveshield.fillRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], YELLOW);
       Waveshield.drawRect(NZ_hitbox[i][1], NZ_hitbox[i][2], NZ_hitbox[i][3] - NZ_hitbox[i][1], NZ_hitbox[i][4] - NZ_hitbox[i][2], BLACK);
       Waveshield.setCursor(NZ_hitbox[i][1] + 15, NZ_hitbox[i][2] + 15);
       Waveshield.setTextSize(3);
-      Waveshield.print("A-M");
+      Waveshield.print(F("A-M"));
     }
   }
 }
@@ -643,18 +591,18 @@ void renderSettings() {
   //Settings
   Waveshield.setCursor(87, 205);
   Waveshield.setTextSize(3);
-  Waveshield.print("Settings");  
+  Waveshield.print(F("Settings"));  
 
   //Settings -> Sound
   Waveshield.setCursor(100, 250);
   Waveshield.setTextSize(2);
-  Waveshield.print("Sound");
+  Waveshield.print(F("Sound"));
   renderSound();
 
   //Settings -> Volume
   Waveshield.setCursor(100, 287);
   Waveshield.setTextSize(2);
-  Waveshield.print("Volume");
+  Waveshield.print(F("Volume"));
   Waveshield.setCursor(185, 287);
   Waveshield.print(String(volume) + "%");
   renderVolume();
@@ -662,13 +610,13 @@ void renderSettings() {
   //Settings -> Light
   Waveshield.setCursor(100, 345);
   Waveshield.setTextSize(2);
-  Waveshield.print("Light");
+  Waveshield.print(F("Light"));
   renderLight();
 
   //Settings -> Blink
   Waveshield.setCursor(100, 385);
   Waveshield.setTextSize(2);
-  Waveshield.print("Blink");
+  Waveshield.print(F("Blink"));
   renderBlink();
 
   //Settings -> Reset
@@ -677,7 +625,7 @@ void renderSettings() {
   Waveshield.setCursor(reset_btn_hb[0] + 12, reset_btn_hb[1] + 5);
   Waveshield.setTextSize(2);
   Waveshield.setTextColor(WHITE);
-  Waveshield.print("Reset");
+  Waveshield.print(F("Reset"));
   Waveshield.setTextColor(BLACK); //set text colour back to black
 }
 
@@ -729,7 +677,7 @@ void render() {
   //Draw top text
   Waveshield.setTextSize(4);
   Waveshield.setCursor(30, 30);
-  Waveshield.print("Car Tracker");
+  Waveshield.print(F("Car Tracker"));
 
   //Draw car parking location
   Waveshield.setTextSize(2);
@@ -745,7 +693,7 @@ void render() {
     Waveshield.print("Your car is at lot "+parking_no+".");
   } else {
     Waveshield.setCursor(25, 80);
-    Waveshield.print("You have not set a lot.");
+    Waveshield.print(F("You have not set a lot."));
   }
   
   //Draw button -> Enter/Change parking lot no.
@@ -753,9 +701,9 @@ void render() {
   Waveshield.drawRoundRect(lot_no_hb[0], lot_no_hb[1], lot_no_hb[2] - lot_no_hb[0], lot_no_hb[3] - lot_no_hb[1], 4, BLACK);
   Waveshield.setCursor(25, 122);
   Waveshield.setTextSize(2);
-  Waveshield.print("Change lot");
+  Waveshield.print(F("Change lot"));
   Waveshield.setCursor(25, 144);
-  Waveshield.print("  number");
+  Waveshield.print(F("  number"));
 
   //Draw button -> Sound alarm/on light
   if (alarm_on) {
@@ -764,18 +712,18 @@ void render() {
     Waveshield.setCursor(175, 122);
     Waveshield.setTextSize(2);
     Waveshield.setTextColor(WHITE);
-    Waveshield.print("Stop alarm");
+    Waveshield.print(F("Stop alarm"));
     Waveshield.setCursor(180, 144);
-    Waveshield.print("and light");
+    Waveshield.print(F("and light"));
     Waveshield.setTextColor(BLACK);
   } else {
     Waveshield.fillRoundRect(st_alm_hb[0], st_alm_hb[1], st_alm_hb[2] - st_alm_hb[0], st_alm_hb[3] - st_alm_hb[1], 4, GREEN);
     Waveshield.drawRoundRect(st_alm_hb[0], st_alm_hb[1], st_alm_hb[2] - st_alm_hb[0], st_alm_hb[3] - st_alm_hb[1], 4, BLACK);
     Waveshield.setCursor(170, 122);
     Waveshield.setTextSize(2);
-    Waveshield.print("Start alarm");
+    Waveshield.print(F("Start alarm"));
     Waveshield.setCursor(170, 144);
-    Waveshield.print(" and light");
+    Waveshield.print(F(" and light"));
   }
 
   //render settings dialog
@@ -793,12 +741,12 @@ void renderConfirmation() {
   //draw text -> Are you sure?
   Waveshield.setCursor(47, 190);
   Waveshield.setTextSize(3);
-  Waveshield.print("Are You Sure?");
+  Waveshield.print(F("Are You Sure?"));
 
   //warning abt recalibration
   Waveshield.setCursor(70, 230);
   Waveshield.setTextSize(1);
-  Waveshield.print("Recalibration will be required.");
+  Waveshield.print(F("Recalibration will be required."));
 
   //Yes button
   Waveshield.fillRoundRect(yes_btn_hb[0], yes_btn_hb[1], yes_btn_hb[2] - yes_btn_hb[0], yes_btn_hb[3] - yes_btn_hb[1], 4, RED);
@@ -806,7 +754,7 @@ void renderConfirmation() {
   Waveshield.setCursor(yes_btn_hb[0] + 25, yes_btn_hb[1] + 15);
   Waveshield.setTextSize(3);
   Waveshield.setTextColor(WHITE);
-  Waveshield.print("Yes");
+  Waveshield.print(F("Yes"));
   Waveshield.setTextColor(BLACK);
 
   //No button
@@ -814,7 +762,7 @@ void renderConfirmation() {
   Waveshield.drawRoundRect(no_btn_hb[0], no_btn_hb[1], no_btn_hb[2] - no_btn_hb[0], no_btn_hb[3] - no_btn_hb[1], 4, BLACK);
   Waveshield.setCursor(no_btn_hb[0] + 33, no_btn_hb[1] + 15);
   Waveshield.setTextSize(3);
-  Waveshield.print("No");
+  Waveshield.print(F("No"));
 }
 
 void doHitboxes(int scrn) {
@@ -859,8 +807,8 @@ void doHitboxes(int scrn) {
       } else if (p.x > st_alm_hb[0] && p.x < st_alm_hb[2] && p.y > st_alm_hb[1] && p.y < st_alm_hb[3]) {
         //start/stop alarm
         renderLoading();
-        send_data_alm();
         alarm_on = !alarm_on;
+        send_data_alm();
         render();
       } else if (p.x > reset_btn_hb[0] && p.x < reset_btn_hb[2] && p.y > reset_btn_hb[1] && p.y < reset_btn_hb[3]) {
         renderConfirmation();
@@ -1031,11 +979,12 @@ void setup() {
   //Initialise
   SPI.begin();
   Waveshield.begin();
+  pinMode(LO_RX_PIN, INPUT);
+  pinMode(LO_TX_PIN, OUTPUT);
+  pinMode(LO_SET, OUTPUT);
+  digitalWrite(LO_SET, HIGH);
+  lora.begin(9600);
   Serial.begin(9600);
-  IR.begin();
-  IR.openWritingPipe(IR_ADDR_W);
-  IR.openReadingPipe(1, IR_ADDR_R);
-  IR.startListening();
 
   //Set portrait
   Waveshield.setRotation(0);
@@ -1075,4 +1024,5 @@ void loop() {
   if (screen == 2 && millis() % 2500 == 0) {
     renderCalibration();
   }
+  lora.print("Hello!");
 }

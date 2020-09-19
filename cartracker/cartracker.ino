@@ -1,7 +1,5 @@
 #include <SoftwareSerial.h>
 #include <SPI.h>
-#include <RF24.h>
-#include <nRF24L01.h>
 #include <EEPROM.h>
 
 #define RX_PIN 4
@@ -21,9 +19,6 @@
 
 SoftwareSerial IOT(RX_PIN, TX_PIN);
 SoftwareSerial lora(LO_RX_PIN, LO_TX_PIN);
-
-const byte IR_ADDR_R[6] = "00001";
-const byte IR_ADDR_W[6] = "00002";
 
 bool blinkOn = false;
 bool masterBuzOn = false;
@@ -81,7 +76,7 @@ bool getAlm() {
 }
 
 void checkLO() {
-  if (lora.available()) {
+  while (lora.available()) {
     Serial.write(lora.read());
   }
 }
@@ -106,17 +101,15 @@ void setup() {
   lora.listen();
   pinMode(ON_OFF, OUTPUT);
   //pinMode(SLEEP_PIN, OUTPUT);
-  pinMode(A0, OUTPUT);
-  pinMode(A1, OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
+  //pinMode(A0, OUTPUT);
+  //pinMode(A1, OUTPUT);
+  //pinMode(LED_PIN, OUTPUT);
   pinMode(LO_SET, OUTPUT);
   digitalWrite(ON_OFF, HIGH);
-  digitalWrite(A0, LOW);
-  digitalWrite(A1, LOW);
+  //digitalWrite(A0, LOW);
+  //digitalWrite(A1, LOW);
   digitalWrite(LED_PIN, LOW);
-  digitalWrite(LO_SET, LOW);
-  lora.print("AA FA AA\r\n");
-  Serial.print(lora.available());
+  digitalWrite(LO_SET, HIGH);
   noTone(BUZ_PIN);
   delay(100);
   //turnOn();
