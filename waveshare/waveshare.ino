@@ -7,6 +7,8 @@
 #define LO_RX_PIN A0
 #define LO_TX_PIN A1
 #define LO_SET A2
+#define LO_MAX_WAIT 100
+#define LO_MAX_RETRY 10
 
 // Assign human-readable names to some common 16-bit color values:
 #define BLACK   0x0000
@@ -26,9 +28,6 @@
 
 Waveshare_ILI9486 Waveshield;
 SoftwareSerial lora(LO_RX_PIN, LO_TX_PIN);
-
-const byte IR_ADDR_W[6] = "00001";
-const byte IR_ADDR_R[6] = "00002";
 
 bool sound = true;
 int volume = 100;
@@ -124,8 +123,43 @@ int yes_btn_hb[4] = {50, 250, 150, 300}; //Used in confirmation screen
 int no_btn_hb[4] = {170, 250, 270, 300}; //Used in confirmation screen
 
 String get_parking_frm_rcvr() {
-  //will actually get
-  delay(1000);
+  //get from rcvr
+  for (int i = 0; i < LO_MAX_RETRY; i++) {
+    byte message[2] = {2, 197};
+    lora.write(message, 2);
+    byte msg[5];
+    int wait = 0;
+    while (wait < LO_MAX_WAIT) {
+      while (!lora.available() and wait < LO_MAX_WAIT) {
+        delay(50);
+        wait++;
+      }
+      for (int i = 0; i < 7; i++) {
+        if (!lora.available()) {
+          break;
+        }
+        byte next = lora.read();
+        if (i == 0 and next != 2) {
+          break; // Wrong command (i.e. wrong message)
+        }
+        if (i >= 1 and i <= 5) {
+          msg[i - 1] = next;
+        }
+        if (i == 6 and next == 197) {
+          //done!
+          if (msg[0] == 0) {
+            return "";
+          } else {
+            String str_msg = (char*)msg;
+            str_msg.trim();
+            return str_msg;
+          }
+        }
+      }
+    }
+  }
+  renderFailed();
+  delay(5000);
   return "-";
 }
 
@@ -166,7 +200,36 @@ void send_data_alm() {
 
 bool is_alarm_on() {
   //get from rcvr
-  delay(100);
+  for (int i = 0; i < LO_MAX_RETRY; i++) {
+    byte message[2] = {1, 197};
+    lora.write(message, 2);
+    bool msg = false;
+    int wait = 0;
+    while (wait < LO_MAX_WAIT) {
+      while (!lora.available() and wait < LO_MAX_WAIT) {
+        delay(10);
+        wait++;
+      }
+      for (int i = 0; i < 3; i++) {
+        if (!lora.available()) {
+          break;
+        }
+        byte next = lora.read();
+        if (i == 0 and next != 1) {
+          break; // Wrong command (i.e. wrong message)
+        }
+        if (i == 1) {
+          msg = next;
+        }
+        if (i == 2 and next == 197) {
+          //done!
+          return msg;
+        }
+      }
+    }
+  }
+  renderFailed();
+  delay(5000);
   return false;
 }
 
@@ -1024,5 +1087,4 @@ void loop() {
   if (screen == 2 && millis() % 2500 == 0) {
     renderCalibration();
   }
-  lora.print("Hello!");
 }

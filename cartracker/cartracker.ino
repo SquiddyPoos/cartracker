@@ -1,3 +1,4 @@
+#include <toneAC.h>
 #include <SoftwareSerial.h>
 #include <SPI.h>
 #include <EEPROM.h>
@@ -12,7 +13,7 @@
 #define LO_SET 13
 
 #define BUZ_PIN 9
-#define LED_PIN 10
+#define LED_PIN 8
 
 #define BLK_DUR 5000
 #define BUZ_DUR 20000
@@ -24,8 +25,11 @@ bool blinkOn = false;
 bool masterBuzOn = false;
 bool lightOn = false;
 bool buzzerOn = false;
+int volume = 10; // Only from 0 to 10
 int toNextBlink = BLK_DUR;
 int toNextBuzzerOff = BUZ_DUR;
+byte current_cmd[100];
+int current_cmd_idx = 0;
 
 /*void turnOn() {
   //pulse off then on
@@ -63,7 +67,25 @@ void sleepOff() {
 }
 
 void writeAlm(bool onOff) {
-  EEPROM.write(0, onOff);
+  EEPROM.update(0, onOff);
+}
+
+void writeParkingLot(byte* no) {
+  // In its final form, this function will call the website
+  // For now, it doesn't
+  for (int i = 0; i < 5; i++) {
+    EEPROM.update(20 + i, no[i]);
+  }
+}
+
+byte* getParkingLot() {
+  // In its final form, this function will call the website
+  // For now, it doesn't
+  byte lot[5];
+  for (int i = 0; i < 5; i++) {
+    lot[i] = EEPROM.read(20 + i);
+  }
+  return lot;
 }
 
 bool getAlm() {
@@ -72,20 +94,64 @@ bool getAlm() {
     EEPROM.update(0, 0);
     onoff = 0;
   }
-  return onoff;
+  //return onoff;
+  return false;
 }
 
 void checkLO() {
   while (lora.available()) {
-    Serial.write(lora.read());
+    //Commands end with 197 (a kinda random no.)
+    byte next = lora.read();
+    if (next == 197) {
+      // Read from our command, in current_cmd
+      Serial.print("Command recieved: ");
+      for (int i = 0; i < current_cmd_idx; i++) {
+        Serial.print(current_cmd[i], DEC);
+        Serial.print(' ');
+      }
+      Serial.println();
+      // Get command
+      byte cmd = current_cmd[0];
+      if (cmd == 1) {
+        // get alarm command
+        byte ret_msg[3] = {1, getAlm(), 197};
+        lora.write(ret_msg, 3);
+      } else if (cmd == 2) {
+        // get parking number
+        byte* lot = getParkingLot();
+        byte msg[7] = {2, 0, 0, 0, 0, 0, 197};
+        for (int i = 1; i < 6; i++) {
+          msg[i] = *(lot + i - 1);
+        }
+        lora.write(msg, 7);
+      } else if (cmd == 3) {
+        // set alarm command
+        writeAlm(current_cmd[1]);
+        bool blinkOn = false;
+        bool masterBuzOn = false;
+        bool lightOn = false;
+        bool buzzerOn = false;
+        int volume = 0;
+        int toNextBlink = BLK_DUR;
+        int toNextBuzzerOff = BUZ_DUR;
+        byte ret_msg[2] = {3, 197}; // A simple acknowledgement
+        lora.write(ret_msg, 2);
+      }
+      // Reset current_cmd_idx to 0
+      memset(current_cmd, 0, 100);
+      current_cmd_idx = 0;
+    } else {
+      current_cmd[current_cmd_idx] = next;
+      current_cmd_idx++;
+    }
   }
 }
 
 void alarmOn(bool buzzer, bool light) {
   if (buzzer) {
-    tone(BUZ_PIN, 512);
+    toneAC(512, volume);
   } else {
-    noTone(BUZ_PIN);
+    noToneAC();
   }
   if (light) {
     digitalWrite(LED_PIN, HIGH);
@@ -101,19 +167,21 @@ void setup() {
   lora.listen();
   pinMode(ON_OFF, OUTPUT);
   //pinMode(SLEEP_PIN, OUTPUT);
-  //pinMode(A0, OUTPUT);
-  //pinMode(A1, OUTPUT);
-  //pinMode(LED_PIN, OUTPUT);
+  pinMode(A0, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
   pinMode(LO_SET, OUTPUT);
   digitalWrite(ON_OFF, HIGH);
-  //digitalWrite(A0, LOW);
-  //digitalWrite(A1, LOW);
+  digitalWrite(A0, LOW);
   digitalWrite(LED_PIN, LOW);
   digitalWrite(LO_SET, HIGH);
   noTone(BUZ_PIN);
   delay(100);
   //turnOn();
   Serial.println("Chip OK");
+  // Clear all messages from lora
+  while (lora.available()) {
+    lora.read();
+  }
 }
 
 void loop() {
