@@ -1,15 +1,15 @@
 #include <toneAC.h>
-#include <SoftwareSerial.h>
+#include <NeoSWSerial.h>
 #include <SPI.h>
 #include <EEPROM.h>
 
-#define RX_PIN 4
+#define RX_PIN 2
 #define TX_PIN 5
 #define SLEEP_PIN 7
 #define ON_OFF 6
 
 #define LO_RX_PIN 3
-#define LO_TX_PIN 2
+#define LO_TX_PIN 4
 #define LO_SET 7
 
 #define LED_PIN 8
@@ -17,8 +17,8 @@
 #define BLK_DUR 5000
 #define BUZ_DUR 20000
 
-SoftwareSerial IOT(RX_PIN, TX_PIN);
-SoftwareSerial lora(LO_RX_PIN, LO_TX_PIN);
+NeoSWSerial IOT(RX_PIN, TX_PIN);
+NeoSWSerial lora(LO_RX_PIN, LO_TX_PIN);
 
 bool blinkOn = false;
 bool masterBuzOn = false;
@@ -112,13 +112,6 @@ void checkLO() {
     //Commands end with 197 (a kinda random no.)
     byte next = lora.read();
     if (next == 197) {
-      // Read from our command, in current_cmd
-      Serial.print("Command recieved: ");
-      for (int i = 0; i < current_cmd_idx; i++) {
-        Serial.print(current_cmd[i], DEC);
-        Serial.print(' ');
-      }
-      Serial.println();
       // Get command
       byte cmd = current_cmd[0];
       if (cmd == 1) {
@@ -133,13 +126,12 @@ void checkLO() {
           msg[i] = lot[i - 1];
         }
         lora.write(msg, 7);
-        Serial.write(msg, 7);
       } else if (cmd == 3) {
         // set alarm command
         writeAlm(current_cmd[1]);
         if (current_cmd[1]) {
           masterBuzOn = current_cmd[2];
-          volume = current_cmd[3] / 10;
+          volume = round((float)current_cmd[3] / 10.0);
           lightOn = current_cmd[4];
           blinkOn = current_cmd[5];
           toNextBlink = BLK_DUR;
