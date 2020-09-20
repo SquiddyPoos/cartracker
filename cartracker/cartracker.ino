@@ -12,7 +12,6 @@
 #define LO_TX_PIN 2
 #define LO_SET 7
 
-#define BUZ_PIN 9
 #define LED_PIN 8
 
 #define BLK_DUR 5000
@@ -70,7 +69,7 @@ void writeAlm(bool onOff) {
   EEPROM.update(0, onOff);
 }
 
-void writeParkingLot(byte* no) {
+void writeParkingLot(byte no[]) {
   // In its final form, this function will call the website
   // For now, it doesn't
   for (int i = 0; i < 5; i++) {
@@ -81,11 +80,22 @@ void writeParkingLot(byte* no) {
 byte* getParkingLot() {
   // In its final form, this function will call the website
   // For now, it doesn't
-  byte lot[5] = {0, 0, 0, 0, 0};
+  static byte lot[5] = {0, 0, 0, 0, 0};
   for (int i = 0; i < 5; i++) {
     lot[i] = EEPROM.read(20 + i);
   }
   return lot;
+}
+
+void resetEEPROM() {
+  //This value will be 255 if this is 1st time init, 0 if not.
+  bool firstTime = EEPROM.read(0);
+  if (firstTime) {
+    EEPROM.update(0, 0);
+    for (int i = 1; i < EEPROM.length(); i++) {
+      EEPROM.update(i, 255);
+    }
+  }
 }
 
 bool getAlm() {
@@ -120,30 +130,39 @@ void checkLO() {
         byte* lot = getParkingLot();
         byte msg[7] = {2, 0, 0, 0, 0, 0, 197};
         for (int i = 1; i < 6; i++) {
-          msg[i] = *(lot + i - 1);
+          msg[i] = lot[i - 1];
         }
         lora.write(msg, 7);
+        Serial.write(msg, 7);
       } else if (cmd == 3) {
         // set alarm command
         writeAlm(current_cmd[1]);
         if (current_cmd[1]) {
-          bool masterBuzOn = current_cmd[2];
-          int volume = current_cmd[3] / 10;
-          bool lightOn = current_cmd[4];
-          bool blinkOn = current_cmd[5];
-          int toNextBlink = BLK_DUR;
-          int toNextBuzzerOff = BUZ_DUR;
+          masterBuzOn = current_cmd[2];
+          volume = current_cmd[3] / 10;
+          lightOn = current_cmd[4];
+          blinkOn = current_cmd[5];
+          toNextBlink = BLK_DUR;
+          toNextBuzzerOff = BUZ_DUR;
         } else {
-          bool blinkOn = false;
-          bool masterBuzOn = false;
-          bool lightOn = false;
-          bool buzzerOn = false;
-          int volume = 10; // Only from 0 to 10
-          int toNextBlink = BLK_DUR;
-          int toNextBuzzerOff = BUZ_DUR;
-          alarmOn(buzzerOn, lightOn);
+          blinkOn = false;
+          masterBuzOn = false;
+          lightOn = false;
+          buzzerOn = false;
+          volume = 10; // Only from 0 to 10
+          toNextBlink = BLK_DUR;
+          toNextBuzzerOff = BUZ_DUR;
         }
+        alarmOn(buzzerOn, lightOn);
         byte ret_msg[2] = {3, 197}; // A simple acknowledgement
+        lora.write(ret_msg, 2);
+      } else if (cmd == 4) {
+        byte parking_lot[5];
+        for (int i = 0; i < 5; i++) {
+          parking_lot[i] = current_cmd[i + 1];
+        }
+        writeParkingLot(parking_lot);
+        byte ret_msg[2] = {4, 197};
         lora.write(ret_msg, 2);
       }
       // Reset current_cmd_idx to 0
@@ -183,6 +202,7 @@ void setup() {
   digitalWrite(A0, LOW);
   digitalWrite(LED_PIN, LOW);
   digitalWrite(LO_SET, HIGH);
+  resetEEPROM();
   noToneAC();
   // Read all from the LoRa
   while (lora.available()) {

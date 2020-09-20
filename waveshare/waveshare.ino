@@ -126,7 +126,7 @@ String get_parking_frm_rcvr() {
   for (int i = 0; i < LO_MAX_RETRY; i++) {
     byte message[2] = {2, 197};
     lora.write(message, 2);
-    byte msg[5] = {0, 0, 0, 0, 0};
+    byte msg[5];
     wait = 0;
     while (wait < LO_MAX_WAIT) {
       while (!lora.available() and wait < LO_MAX_WAIT) {
@@ -146,10 +146,13 @@ String get_parking_frm_rcvr() {
         }
         if (i == 6 and next == 197) {
           //done!
-          if (msg[0] == 0) {
+          if (msg[0] == 255) {
             return "";
           } else {
-            String str_msg = (char*)msg;
+            String str_msg = "";
+            for (int i = 0; i < 5; i++) {
+              str_msg += (char)msg[i];
+            }
             str_msg.trim();
             return str_msg;
           }
@@ -182,14 +185,43 @@ String get_parking_no() {
 }
 
 void send_data_parking() {
+  byte msg[7] = {4, 0, 0, 0, 0, 0, 197};
   for (int i = 20; i < 25; i++) {
     if (i < 20 + parking_no.length()) {
       EEPROM.update(i, parking_no[i - 20]);
+      msg[i - 19] = parking_no[i - 20];
     } else {
       EEPROM.update(i, ' ');
+      msg[i - 19] = ' ';
     }
   }
-  delay(3000);
+  int wait = 0;
+  for (int i = 0; i < LO_MAX_RETRY; i++) {
+    //send alarm_on, along with sound, light & lblink
+    lora.write(msg, 7);
+    wait = 0;
+    while (wait < LO_MAX_WAIT) {
+      while (!lora.available() and wait < LO_MAX_WAIT) {
+        delay(10);
+        wait++;
+      }
+      for (int i = 0; i < 2; i++) {
+        if (!lora.available()) {
+          break;
+        }
+        byte next = lora.read();
+        if (i == 0 and next != 4) {
+          break; // Wrong command (i.e. wrong message)
+        }
+        if (i == 1 and next == 197) {
+          return;
+        }
+      }
+    }
+  }
+  renderFailed();
+  delay(2500);
+  return;
 }
 
 void send_data_alm() {
@@ -197,11 +229,11 @@ void send_data_alm() {
   for (int i = 0; i < LO_MAX_RETRY; i++) {
     //send alarm_on, along with sound, light & lblink
     if (alarm_on) {
-      byte msg[3] = {3, alarm_on, 197};
-      lora.write(msg, 3);
-    } else {
       byte msg[7] = {3, alarm_on, sound, volume, light, lblink, 197};
       lora.write(msg, 7);
+    } else {
+      byte msg[3] = {3, alarm_on, 197};
+      lora.write(msg, 3);
     }
     wait = 0;
     while (wait < LO_MAX_WAIT) {
@@ -461,8 +493,17 @@ void renderFailed() {
 
   //Draw loading
   Waveshield.setTextSize(2);
-  Waveshield.setCursor(45, 200);
+  Waveshield.setCursor(45, 180);
   Waveshield.print(F("Failed transmission."));
+
+  //Draw error msg
+  Waveshield.setTextSize(1);
+  Waveshield.setCursor(70, 210);
+  Waveshield.print(F("The receiver may be too far away"));
+
+  Waveshield.setTextSize(1);
+  Waveshield.setCursor(70, 220);
+  Waveshield.print(F("       or it may be busy.       "));
 }
 
 void renderNumber() {
