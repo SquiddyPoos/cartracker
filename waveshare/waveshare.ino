@@ -1,11 +1,9 @@
 #include <SPI.h>
 #include <Adafruit_GFX.h>
-#include <Waveshare_ILI9486.h>
+#include <Waveshare_ILI9486_Modified.h>
+#include <AltSoftSerial.h>
 #include <EEPROM.h>
-#include <SoftwareSerial.h>
 
-#define LO_RX_PIN A0
-#define LO_TX_PIN A1
 #define LO_SET A2
 #define LO_MAX_WAIT 100
 #define LO_MAX_RETRY 10
@@ -27,10 +25,10 @@
 #define NZ_SIZE     19
 
 Waveshare_ILI9486 Waveshield;
-SoftwareSerial lora(LO_RX_PIN, LO_TX_PIN);
+AltSoftSerial lora;
 
 bool sound = true;
-int volume = 100;
+byte volume = 100;
 bool light = true;
 bool lblink = true;
 String parking_no = "";
@@ -124,14 +122,15 @@ int no_btn_hb[4] = {170, 250, 270, 300}; //Used in confirmation screen
 
 String get_parking_frm_rcvr() {
   //get from rcvr
+  int wait = 0;
   for (int i = 0; i < LO_MAX_RETRY; i++) {
     byte message[2] = {2, 197};
     lora.write(message, 2);
-    byte msg[5];
-    int wait = 0;
+    byte msg[5] = {0, 0, 0, 0, 0};
+    wait = 0;
     while (wait < LO_MAX_WAIT) {
       while (!lora.available() and wait < LO_MAX_WAIT) {
-        delay(50);
+        delay(10);
         wait++;
       }
       for (int i = 0; i < 7; i++) {
@@ -159,7 +158,7 @@ String get_parking_frm_rcvr() {
     }
   }
   renderFailed();
-  delay(5000);
+  delay(2500);
   return "-";
 }
 
@@ -194,17 +193,49 @@ void send_data_parking() {
 }
 
 void send_data_alm() {
-  //send alarm_on, along with sound, light & lblink
-  delay(1000);
+  int wait = 0;
+  for (int i = 0; i < LO_MAX_RETRY; i++) {
+    //send alarm_on, along with sound, light & lblink
+    if (alarm_on) {
+      byte msg[3] = {3, alarm_on, 197};
+      lora.write(msg, 3);
+    } else {
+      byte msg[7] = {3, alarm_on, sound, volume, light, lblink, 197};
+      lora.write(msg, 7);
+    }
+    wait = 0;
+    while (wait < LO_MAX_WAIT) {
+      while (!lora.available() and wait < LO_MAX_WAIT) {
+        delay(10);
+        wait++;
+      }
+      for (int i = 0; i < 2; i++) {
+        if (!lora.available()) {
+          break;
+        }
+        byte next = lora.read();
+        if (i == 0 and next != 3) {
+          break; // Wrong command (i.e. wrong message)
+        }
+        if (i == 1 and next == 197) {
+          return;
+        }
+      }
+    }
+  }
+  renderFailed();
+  delay(2500);
+  return;
 }
 
 bool is_alarm_on() {
   //get from rcvr
+  int wait = 0;
   for (int i = 0; i < LO_MAX_RETRY; i++) {
     byte message[2] = {1, 197};
     lora.write(message, 2);
     bool msg = false;
-    int wait = 0;
+    wait = 0;
     while (wait < LO_MAX_WAIT) {
       while (!lora.available() and wait < LO_MAX_WAIT) {
         delay(10);
@@ -229,7 +260,7 @@ bool is_alarm_on() {
     }
   }
   renderFailed();
-  delay(5000);
+  delay(2500);
   return false;
 }
 
@@ -1042,12 +1073,15 @@ void setup() {
   //Initialise
   SPI.begin();
   Waveshield.begin();
-  pinMode(LO_RX_PIN, INPUT);
-  pinMode(LO_TX_PIN, OUTPUT);
   pinMode(LO_SET, OUTPUT);
   digitalWrite(LO_SET, HIGH);
   lora.begin(9600);
   Serial.begin(9600);
+
+  // Read all from the LoRa
+  while (lora.available()) {
+    lora.read();
+  }
 
   //Set portrait
   Waveshield.setRotation(0);
@@ -1079,6 +1113,7 @@ void setup() {
   }
   Waveshield.setTsConfigData(tscd);
 
+  // Render the screen
   render();
 }
 

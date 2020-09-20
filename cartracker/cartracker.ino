@@ -10,7 +10,7 @@
 
 #define LO_RX_PIN 3
 #define LO_TX_PIN 2
-#define LO_SET 13
+#define LO_SET 7
 
 #define BUZ_PIN 9
 #define LED_PIN 8
@@ -81,7 +81,7 @@ void writeParkingLot(byte* no) {
 byte* getParkingLot() {
   // In its final form, this function will call the website
   // For now, it doesn't
-  byte lot[5];
+  byte lot[5] = {0, 0, 0, 0, 0};
   for (int i = 0; i < 5; i++) {
     lot[i] = EEPROM.read(20 + i);
   }
@@ -94,8 +94,7 @@ bool getAlm() {
     EEPROM.update(0, 0);
     onoff = 0;
   }
-  //return onoff;
-  return false;
+  return onoff;
 }
 
 void checkLO() {
@@ -127,13 +126,23 @@ void checkLO() {
       } else if (cmd == 3) {
         // set alarm command
         writeAlm(current_cmd[1]);
-        bool blinkOn = false;
-        bool masterBuzOn = false;
-        bool lightOn = false;
-        bool buzzerOn = false;
-        int volume = 0;
-        int toNextBlink = BLK_DUR;
-        int toNextBuzzerOff = BUZ_DUR;
+        if (current_cmd[1]) {
+          bool masterBuzOn = current_cmd[2];
+          int volume = current_cmd[3] / 10;
+          bool lightOn = current_cmd[4];
+          bool blinkOn = current_cmd[5];
+          int toNextBlink = BLK_DUR;
+          int toNextBuzzerOff = BUZ_DUR;
+        } else {
+          bool blinkOn = false;
+          bool masterBuzOn = false;
+          bool lightOn = false;
+          bool buzzerOn = false;
+          int volume = 10; // Only from 0 to 10
+          int toNextBlink = BLK_DUR;
+          int toNextBuzzerOff = BUZ_DUR;
+          alarmOn(buzzerOn, lightOn);
+        }
         byte ret_msg[2] = {3, 197}; // A simple acknowledgement
         lora.write(ret_msg, 2);
       }
@@ -174,14 +183,13 @@ void setup() {
   digitalWrite(A0, LOW);
   digitalWrite(LED_PIN, LOW);
   digitalWrite(LO_SET, HIGH);
-  noTone(BUZ_PIN);
-  delay(100);
-  //turnOn();
-  Serial.println("Chip OK");
-  // Clear all messages from lora
+  noToneAC();
+  // Read all from the LoRa
   while (lora.available()) {
     lora.read();
   }
+  //turnOn();
+  Serial.println("Chip OK");
 }
 
 void loop() {

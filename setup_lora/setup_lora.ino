@@ -1,12 +1,16 @@
 #include <SoftwareSerial.h>
 
-SoftwareSerial lora(A0, A1);
+#define LO_RX_PIN 3
+#define LO_TX_PIN 2
+#define LO_SET 7
+
+SoftwareSerial lora(LO_RX_PIN, LO_TX_PIN);
 
 void setup() {
   // put your setup code here, to run once:
-  pinMode(A0, INPUT);
-  pinMode(A1, OUTPUT);
-  pinMode(A2, OUTPUT);
+  pinMode(LO_RX_PIN, INPUT);
+  pinMode(LO_TX_PIN, OUTPUT);
+  pinMode(LO_SET, OUTPUT);
   digitalWrite(A2, LOW);
   lora.begin(9600);
   delay(100);
