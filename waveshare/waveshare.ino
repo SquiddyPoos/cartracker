@@ -24,6 +24,9 @@
 #define AM_SIZE     19
 #define NZ_SIZE     19
 
+#define PRESSURE 50
+#define SEND_LOT_NO 30 //EEPROM location to tell us to resend parking lot data. ON -> no, OFF -> yes
+
 Waveshare_ILI9486 Waveshield;
 AltSoftSerial lora;
 
@@ -45,10 +48,10 @@ TSConfigData tscd = {100, 939, 59, 970}; //calibration, determined experimentall
 //-1 -> bcsp, -2 is a back button, -3 is enter, -4 is remove button (revert to not set), -5 -> A - N, -6 -> O - Z
 //Order is for aesthetic purposes (drawing is not instant)
 int keypad_hitbox[KEYPAD_SIZE][5] = {
-  {-2, 0, 0, 140, 50},
-  {-4, 190, 0, 320, 50},
-  {-5, 0, 150, 80, 200},
-  {-6, 240, 150, 320, 200},
+  { -2, 0, 0, 140, 50},
+  { -4, 190, 0, 320, 50},
+  { -5, 0, 150, 80, 200},
+  { -6, 240, 150, 320, 200},
   {1, 0, 200, 106, 270},
   {2, 106, 200, 213, 270},
   {3, 213, 200, 320, 270},
@@ -58,16 +61,16 @@ int keypad_hitbox[KEYPAD_SIZE][5] = {
   {7, 0, 340, 106, 410},
   {8, 106, 340, 213, 410},
   {9, 213, 340, 320, 410},
-  {-1, 213, 410, 320, 480},
+  { -1, 213, 410, 320, 480},
   {0, 106, 410, 213, 480},
-  {-3, 0, 410, 106, 480}
+  { -3, 0, 410, 106, 480}
 };
 
 int AM_hitbox[AM_SIZE][5] = {
-  {-2, 0, 0, 140, 50},
-  {-4, 190, 0, 320, 50},
-  {-5, 0, 150, 80, 200},
-  {-6, 240, 150, 320, 200},
+  { -2, 0, 0, 140, 50},
+  { -4, 190, 0, 320, 50},
+  { -5, 0, 150, 80, 200},
+  { -6, 240, 150, 320, 200},
   {'A', 0, 200, 80, 270},
   {'B', 80, 200, 160, 270},
   {'C', 160, 200, 240, 270},
@@ -80,16 +83,16 @@ int AM_hitbox[AM_SIZE][5] = {
   {'J', 80, 340, 160, 410},
   {'K', 160, 340, 240, 410},
   {'L', 240, 340, 320, 410},
-  {-1, 213, 410, 320, 480},
+  { -1, 213, 410, 320, 480},
   {'M', 106, 410, 213, 480},
-  {-3, 0, 410, 106, 480}
+  { -3, 0, 410, 106, 480}
 };
 
 int NZ_hitbox[NZ_SIZE][5] = {
-  {-2, 0, 0, 140, 50},
-  {-4, 190, 0, 320, 50},
-  {-5, 0, 150, 80, 200},
-  {-6, 240, 150, 320, 200},
+  { -2, 0, 0, 140, 50},
+  { -4, 190, 0, 320, 50},
+  { -5, 0, 150, 80, 200},
+  { -6, 240, 150, 320, 200},
   {'N', 0, 200, 80, 270},
   {'O', 80, 200, 160, 270},
   {'P', 160, 200, 240, 270},
@@ -102,9 +105,9 @@ int NZ_hitbox[NZ_SIZE][5] = {
   {'W', 80, 340, 160, 410},
   {'X', 160, 340, 240, 410},
   {'Y', 240, 340, 320, 410},
-  {-1, 213, 410, 320, 480},
+  { -1, 213, 410, 320, 480},
   {'Z', 106, 410, 213, 480},
-  {-3, 0, 410, 106, 480}
+  { -3, 0, 410, 106, 480}
 };
 
 int lot_no_hb[4] = {15, 115, 155, 165}; //hitbox for the change lot button
@@ -165,21 +168,32 @@ String get_parking_frm_rcvr() {
   return "-";
 }
 
+String get_parking_EEPROM() {
+  String pkng = "";
+  if (EEPROM.read(20) == 255) {
+    return pkng;
+  }
+  pkng += (char)EEPROM.read(20);
+  pkng += (char)EEPROM.read(21);
+  pkng += (char)EEPROM.read(22);
+  pkng += (char)EEPROM.read(23);
+  pkng += (char)EEPROM.read(24);
+  pkng.trim(); //remove any trailing whitespace
+  return pkng;
+}
+
 String get_parking_no() {
-  //grab from EEPROM if cannot connect
-  String pkng = get_parking_frm_rcvr();
-  if (pkng == "-") {
-    //locations are: 20, 21, 22, 23, 24
-    pkng = "";
-    if (EEPROM.read(20) == 255) {
-      return pkng;
+  String pkng;
+  if (EEPROM.read(SEND_LOT_NO)) {
+    pkng = get_parking_frm_rcvr();
+    if (pkng == "-") {
+      pkng = get_parking_EEPROM();
     }
-    pkng += (char)EEPROM.read(20);
-    pkng += (char)EEPROM.read(21);
-    pkng += (char)EEPROM.read(22);
-    pkng += (char)EEPROM.read(23);
-    pkng += (char)EEPROM.read(24);
-    pkng.trim(); //remove any trailing whitespace
+  } else {
+    // If the parking no has NOT been sent, get from EEPROM, then send.
+    pkng = get_parking_EEPROM();
+    parking_no = pkng;
+    send_data_parking();
   }
   return pkng;
 }
@@ -214,11 +228,13 @@ void send_data_parking() {
           break; // Wrong command (i.e. wrong message)
         }
         if (i == 1 and next == 197) {
+          EEPROM.update(SEND_LOT_NO, 255);
           return;
         }
       }
     }
   }
+  EEPROM.update(SEND_LOT_NO, 0);
   renderFailed();
   delay(2500);
   return;
@@ -437,7 +453,7 @@ String correct_format(String no, int len) {
 void renderCalibration() {
   //Set screen
   screen = 2;
-  
+
   //Set colour
   Waveshield.fillScreen(LBLUE);
   Waveshield.setTextColor(BLACK);
@@ -472,7 +488,7 @@ void renderCalibration() {
 void renderLoading() {
   //Set screen
   screen = 3;
-  
+
   //Set colour
   Waveshield.fillScreen(LBLUE);
   Waveshield.setTextColor(BLACK);
@@ -486,7 +502,7 @@ void renderLoading() {
 void renderFailed() {
   //Set screen
   screen = 3;
-  
+
   //Set colour
   Waveshield.fillScreen(LBLUE);
   Waveshield.setTextColor(BLACK);
@@ -517,7 +533,7 @@ void renderNumber() {
 }
 
 void renderKeypad() {
-  //base render function for general keypad layout  
+  //base render function for general keypad layout
   //set colour
   Waveshield.fillScreen(LBLUE);
   Waveshield.setTextColor(BLACK);
@@ -547,10 +563,10 @@ void renderKeypad() {
   render09();
 }
 
-void render09() { 
+void render09() {
   //set screen
-  screen = 1; 
-  
+  screen = 1;
+
   Waveshield.fillRect(0, 200, 320, 280, YELLOW);
   //based on the hitboxes in keypad_hitbox.
   for (byte i = 0; i < KEYPAD_SIZE; i++) {
@@ -601,10 +617,10 @@ void render09() {
 void renderAM() {
   //set screen
   screen = 5;
-  
+
   //Render number -> adds number & updates it
   renderNumber();
-  
+
   Waveshield.fillRect(0, 200, 320, 280, YELLOW);
   //based on the hitboxes in AM_hitbox.
   for (byte i = 0; i < AM_SIZE; i++) {
@@ -661,10 +677,10 @@ void renderAM() {
 void renderNZ() {
   //set screen
   screen = 6;
-  
+
   //Render number -> adds number & updates it
   renderNumber();
-  
+
   Waveshield.fillRect(0, 200, 320, 280, YELLOW);
   //based on the hitboxes in NZ_hitbox.
   for (byte i = 0; i < NZ_SIZE; i++) {
@@ -722,11 +738,11 @@ void renderSettings() {
   //Draw box around settings
   Waveshield.fillRoundRect(15, 185, 290, 270, 5, WHITE);
   Waveshield.drawRoundRect(15, 185, 290, 270, 5, BLACK);
-   
+
   //Settings
   Waveshield.setCursor(87, 205);
   Waveshield.setTextSize(3);
-  Waveshield.print(F("Settings"));  
+  Waveshield.print(F("Settings"));
 
   //Settings -> Sound
   Waveshield.setCursor(100, 250);
@@ -756,7 +772,7 @@ void renderSettings() {
 
   //Settings -> Reset
   Waveshield.fillRoundRect(reset_btn_hb[0], reset_btn_hb[1], reset_btn_hb[2] - reset_btn_hb[0], reset_btn_hb[3] - reset_btn_hb[1], 4, RED);
-  Waveshield.drawRoundRect(reset_btn_hb[0], reset_btn_hb[1], reset_btn_hb[2] - reset_btn_hb[0], reset_btn_hb[3] - reset_btn_hb[1], 4, BLACK); 
+  Waveshield.drawRoundRect(reset_btn_hb[0], reset_btn_hb[1], reset_btn_hb[2] - reset_btn_hb[0], reset_btn_hb[3] - reset_btn_hb[1], 4, BLACK);
   Waveshield.setCursor(reset_btn_hb[0] + 12, reset_btn_hb[1] + 5);
   Waveshield.setTextSize(2);
   Waveshield.setTextColor(WHITE);
@@ -780,7 +796,7 @@ void renderVolume() {
   Waveshield.fillRect(185, 287, 70, 50, WHITE);
   Waveshield.setCursor(185, 287);
   Waveshield.print(String(volume) + "%");
-  
+
   //draw new
   volSlider(105, 317, volume);
 }
@@ -804,7 +820,7 @@ void renderBlink() {
 void render() {
   //set screen
   screen = 0;
-  
+
   //set colour
   Waveshield.fillScreen(LBLUE);
   Waveshield.setTextColor(BLACK);
@@ -820,17 +836,17 @@ void render() {
     //Get width & height
     int x1, y1; //this is always 0, 0
     unsigned int w, h;
-    String printed = "Your car is at lot "+parking_no+".";
+    String printed = "Your car is at lot " + parking_no + ".";
     Waveshield.getTextBounds(printed, 0, 0, &x1, &y1, &w, &h);
 
     //Set cursor to be centered
-    Waveshield.setCursor(160 - w/2, 80);
-    Waveshield.print("Your car is at lot "+parking_no+".");
+    Waveshield.setCursor(160 - w / 2, 80);
+    Waveshield.print("Your car is at lot " + parking_no + ".");
   } else {
     Waveshield.setCursor(25, 80);
     Waveshield.print(F("You have not set a lot."));
   }
-  
+
   //Draw button -> Enter/Change parking lot no.
   Waveshield.fillRoundRect(lot_no_hb[0], lot_no_hb[1], lot_no_hb[2] - lot_no_hb[0], lot_no_hb[3] - lot_no_hb[1], 4, YELLOW);
   Waveshield.drawRoundRect(lot_no_hb[0], lot_no_hb[1], lot_no_hb[2] - lot_no_hb[0], lot_no_hb[3] - lot_no_hb[1], 4, BLACK);
@@ -906,7 +922,7 @@ void doHitboxes(int scrn) {
   Waveshield.normalizeTsPoint(p);
 
   //check if press ok
-  if (p.x >= 0 && p.y >= 0 && Waveshield.pressure() > 50) {
+  if (p.x >= 0 && p.y >= 0 && Waveshield.pressure() > PRESSURE) {
     if (scrn == 0) {
       //sound btn
       if (p.x > snd_btn_hb[0] && p.x < snd_btn_hb[2] && p.y > snd_btn_hb[1] && p.y < snd_btn_hb[3]) {
@@ -914,21 +930,21 @@ void doHitboxes(int scrn) {
         setVariables();
         renderSound();
         delay(200);
-      //light btn
+        //light btn
       } else if (p.x > lgt_btn_hb[0] && p.x < lgt_btn_hb[2] && p.y > lgt_btn_hb[1] && p.y < lgt_btn_hb[3]) {
         light = !light;
         setVariables();
         //Note: the render function creates a natural delay.
         renderLight();
         delay(200);
-      //Blink button
+        //Blink button
       } else if (p.x > blk_btn_hb[0] && p.x < blk_btn_hb[2] && p.y > blk_btn_hb[1] && p.y < blk_btn_hb[3]) {
         lblink = !lblink;
         setVariables();
         //Note: the render function creates a natural delay.
         renderBlink();
         delay(200);
-      //Volume button
+        //Volume button
       } else if (p.x > vlm_btn_hb[0] && p.x < vlm_btn_hb[2] && p.y > vlm_btn_hb[1] && p.y < vlm_btn_hb[3]) {
         int new_volume = max(0, min((p.x - vlm_btn_hb[4]) * 100 / SLEN, 100));
         if (new_volume != volume) {
@@ -960,7 +976,7 @@ void doHitboxes(int scrn) {
             if (current_number.length() > 5) {
               current_number = current_number.substring(1, current_number.length());
             }
-            
+
             renderNumber();
             delay(200);
           } else if (keypad_hitbox[i][0] == -2) {
@@ -1024,7 +1040,7 @@ void doHitboxes(int scrn) {
             if (current_number.length() > 5) {
               current_number = current_number.substring(1, current_number.length());
             }
-            
+
             renderNumber();
             delay(200);
           } else if (AM_hitbox[i][0] == -2) {
@@ -1071,7 +1087,7 @@ void doHitboxes(int scrn) {
             if (current_number.length() > 5) {
               current_number = current_number.substring(1, current_number.length());
             }
-            
+
             renderNumber();
             delay(200);
           } else if (NZ_hitbox[i][0] == -2) {
