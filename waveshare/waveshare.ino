@@ -165,6 +165,7 @@ String get_parking_frm_rcvr() {
   }
   renderFailed();
   delay(2500);
+  renderLoading();
   return "-";
 }
 
@@ -237,6 +238,7 @@ void send_data_parking() {
   EEPROM.update(SEND_LOT_NO, 0);
   renderFailed();
   delay(2500);
+  renderLoading();
   return;
 }
 
@@ -273,6 +275,7 @@ void send_data_alm() {
   }
   renderFailed();
   delay(2500);
+  renderLoading();
   return;
 }
 
@@ -309,6 +312,7 @@ bool is_alarm_on() {
   }
   renderFailed();
   delay(2500);
+  renderLoading();
   return false;
 }
 
@@ -755,7 +759,7 @@ void renderSettings() {
   Waveshield.setTextSize(2);
   Waveshield.print(F("Volume"));
   Waveshield.setCursor(185, 287);
-  Waveshield.print(String(volume) + "%");
+  Waveshield.print(String(volume) + '%');
   renderVolume();
 
   //Settings -> Light
@@ -795,7 +799,7 @@ void renderVolume() {
   //draw text
   Waveshield.fillRect(185, 287, 70, 50, WHITE);
   Waveshield.setCursor(185, 287);
-  Waveshield.print(String(volume) + "%");
+  Waveshield.print(String(volume) + '%');
 
   //draw new
   volSlider(105, 317, volume);

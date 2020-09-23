@@ -17,6 +17,8 @@
 #define BLK_DUR 5000
 #define BUZ_DUR 20000
 
+#define GPS_TIMER 1000000
+
 NeoSWSerial IOT(RX_PIN, TX_PIN);
 NeoSWSerial lora(LO_RX_PIN, LO_TX_PIN);
 
@@ -29,12 +31,14 @@ int toNextBlink = BLK_DUR;
 int toNextBuzzerOff = BUZ_DUR;
 byte current_cmd[100];
 int current_cmd_idx = 0;
+long to_next_gps = GPS_TIMER;
 
-/*void turnOn() {
+void turnOn() {
   //pulse off then on
   digitalWrite(ON_OFF, LOW);
   delay(1050); //At least 1s (datasheet)
   digitalWrite(ON_OFF, HIGH);
+  IOT.listen();
   //wait for UART port -> from datasheet, minimum 4.5s. Spam "AT" and wait for "OK"
   while (!IOT.available()) {
     Serial.println("Sent AT signal...");
@@ -45,17 +49,33 @@ int current_cmd_idx = 0;
   while (IOT.available()) {
     IOT.read();
   }
-}*/
+  initGPS();
+  lora.listen();
+  return;
+}
 
-/*String getGPSData() {
+void initGPS() {
+  IOT.listen();
   IOT.write("AT+CGNSPWR=1\r\n");
+  while (!IOT.available()) {
+    Serial.println("Trying init...");
+    IOT.write("AT+CGNSPWR=1\r\n");
+    delay(1000);
+  }
+  return;
+}
+
+String getGPSData() {
+  IOT.listen();
   IOT.write("AT+CGNSINF\r\n");
   String data = "";
+  delay(80);
   while (IOT.available()) {
-    data += IOT.read();
+    data += (char)IOT.read();
   }
+  lora.listen();
   return data;
-}*/
+}
 
 void sleepOn() {
   digitalWrite(SLEEP_PIN, HIGH);
@@ -186,7 +206,7 @@ void setup() {
   lora.begin(9600);
   lora.listen();
   pinMode(ON_OFF, OUTPUT);
-  //pinMode(SLEEP_PIN, OUTPUT);
+  pinMode(SLEEP_PIN, OUTPUT);
   pinMode(A0, OUTPUT);
   pinMode(LED_PIN, OUTPUT);
   pinMode(LO_SET, OUTPUT);
@@ -196,11 +216,12 @@ void setup() {
   digitalWrite(LO_SET, HIGH);
   resetEEPROM();
   noToneAC();
+  delay(10);
   // Read all from the LoRa
   while (lora.available()) {
     lora.read();
   }
-  //turnOn();
+  turnOn();
   Serial.println("Chip OK");
 }
 
@@ -225,5 +246,13 @@ void loop() {
     buzzerOn = !buzzerOn;
     alarmOn(buzzerOn, lightOn);
     toNextBuzzerOff = BUZ_DUR;
+  }
+
+  to_next_gps--;
+
+  if (to_next_gps <= 0) {
+    to_next_gps = GPS_TIMER;
+    Serial.print("GPS data: ");
+    Serial.println(getGPSData());
   }
 }
