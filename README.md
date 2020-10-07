@@ -7,8 +7,8 @@ Additional modules required: \
 AltSoftSerial, NeoSWSerial, toneAC
 
 ### Additional notes
-If you want the raw github repositiory, run: \
+If you want the raw github repositiory, run:
 ```
 git clone https://github.com/SquiddyPoos/cartracker
-``` \
+```
 Will NOT work on Windows, unless you install git.
