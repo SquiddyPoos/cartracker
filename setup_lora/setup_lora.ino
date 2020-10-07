@@ -1,15 +1,15 @@
 #include <SoftwareSerial.h>
 
 // Configuration: change settings here
-#define LO_RX_PIN 3     /* Note: the one labeled "TX", not "RX" */
-#define LO_TX_PIN 2     /* Note: the one labeled "RX", not "TX" */
-#define LO_SET    7     /* Labeled "SET" */   
-#define FREQUENCY 28
+#define LO_RX_PIN 8      /* Note: the one labeled "TX", not "RX" */
+#define LO_TX_PIN 9      /* Note: the one labeled "RX", not "TX" */
+#define LO_SET    10     /* Labeled "SET" */   
+#define FREQUENCY 0x12
 /* Values below are in hexadecimal. You can use 00 - FF. */
 /* Do not remove the 0x part. Only use the last 2 digits. */
-#define NET_ID_1  0x12 
-#define NET_ID_2  0x12
-#define NET_ID_3  0x10
+#define NET_ID_1  0x46
+#define NET_ID_2  0x16
+#define NET_ID_3  0xA7
 #define NET_ID_4  0x12
 #define NODE_ID_1 0x00
 #define NODE_ID_2 0x0A
@@ -22,10 +22,13 @@ void setup() {
   pinMode(LO_RX_PIN, INPUT);
   pinMode(LO_TX_PIN, OUTPUT);
   pinMode(LO_SET, OUTPUT);
-  digitalWrite(A2, LOW);
+  digitalWrite(LO_SET, LOW);
   lora.begin(9600);
   delay(100);
   byte command[33] = {0xAA, 0xFA, 0x03, FREQUENCY, 0x04, 0x03, 0x07, 0x03, 0x02, 0x01, 0x01, NET_ID_1, NET_ID_2, NET_ID_3, NET_ID_4, NODE_ID_1, NODE_ID_2, 0x00, 0x00, 0x00, 0x00, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
+  while (lora.available()) {
+    lora.read();
+  }
   lora.write(command, 33);
   Serial.begin(9600);
 }
